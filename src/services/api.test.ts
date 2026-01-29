@@ -406,7 +406,8 @@ describe('ApiService', () => {
       const mockUser = {
         email: 'stored@example.com',
         name: 'Stored User',
-        role: 'CUSTOMER',
+        role: 'CUSTOMER' as const,
+        phoneNumber: '555-1234',
       };
       vi.mocked(tokenStorage).getUser.mockReturnValue(mockUser);
 
