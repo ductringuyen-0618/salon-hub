@@ -1,6 +1,20 @@
 import { API_CONFIG } from '@/config/api';
 import { tokenStorage } from '@/lib/tokenStorage';
 
+// Error response from backend
+export interface ApiErrorResponse {
+  timestamp: string;
+  status: number;
+  error: string;
+  message: string;
+  path?: string;
+  fieldErrors?: {
+    field: string;
+    message: string;
+    rejectedValue?: any;
+  }[];
+}
+
 // Types based on the backend API
 export interface User {
   id: number;
@@ -182,10 +196,23 @@ class ApiService {
       if (response.status === 401 || response.status === 403) {
         // Clear invalid session
         tokenStorage.clearSession();
+        
+        // Try to get error message from response
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json() as ApiErrorResponse;
+          throw new Error(errorData.message || `Authentication failed: ${response.status} ${response.statusText}`);
+        }
         throw new Error(`Authentication failed: ${response.status} ${response.statusText}`);
       }
       
       if (!response.ok) {
+        // Try to get error message from response
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json() as ApiErrorResponse;
+          throw new Error(errorData.message || `API Error: ${response.status} ${response.statusText}`);
+        }
         throw new Error(`API Error: ${response.status} ${response.statusText}`);
       }
 
@@ -220,6 +247,12 @@ class ApiService {
       const response = await fetch(url, config);
       
       if (!response.ok) {
+        // Try to get error message from response
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json() as ApiErrorResponse;
+          throw new Error(errorData.message || `API Error: ${response.status} ${response.statusText}`);
+        }
         throw new Error(`API Error: ${response.status} ${response.statusText}`);
       }
 
@@ -238,7 +271,8 @@ class ApiService {
 
   // Authentication endpoints
   async login(credentials: LoginRequest): Promise<AuthenticationResponse> {
-    const response = await this.request<AuthenticationResponse>('/auth/login', {
+    // Login is a public endpoint - no auth required
+    const response = await this.publicRequest<AuthenticationResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
@@ -247,7 +281,8 @@ class ApiService {
   }
 
   async register(userData: RegisterRequest): Promise<AuthenticationResponse> {
-    const response = await this.request<AuthenticationResponse>('/auth/register', {
+    // Register is a public endpoint - no auth required
+    const response = await this.publicRequest<AuthenticationResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
