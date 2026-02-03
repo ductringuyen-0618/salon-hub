@@ -29,8 +29,10 @@ export interface User {
 export interface Customer {
   id: number;
   name: string;
-  email: string;
-  phoneNumber: string;
+  email?: string;
+  phoneNumber?: string;
+  note?: string;
+  // Legacy fields for backward compatibility
   lastVisit?: string;
   notes?: string;
 }
@@ -38,10 +40,11 @@ export interface Customer {
 export interface Employee {
   id: number;
   name: string;
-  email: string;
-  phoneNumber: string;
-  role: 'ADMIN' | 'MANAGER' | 'FRONT_DESK' | 'TECHNICIAN';
   available: boolean;
+  role: 'ADMIN' | 'MANAGER' | 'FRONT_DESK' | 'TECHNICIAN';
+  // Optional fields that frontend might use
+  email?: string;
+  phoneNumber?: string;
   specialties?: string[];
 }
 
@@ -60,23 +63,53 @@ export interface Service {
 
 export interface Appointment {
   id: number;
-  customer: Customer;
-  employee: Employee;
-  service: Service;
-  scheduledTime: string;
-  status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  customerId: number;
+  employeeId?: number;
+  services: ServiceTypeResponse[];
+  totalEstimatedDuration?: number;
+  startTime: string;
+  actualEndTime?: string;
+  status: 'PENDING' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
+  // Legacy fields for backward compatibility with UI components
+  customer?: Customer;
+  employee?: Employee;
+  service?: Service;
+  scheduledTime?: string;
   notes?: string;
+}
+
+// Backend ServiceType response format
+export interface ServiceTypeResponse {
+  id: number;
+  name: string;
+  description?: string;
+  estimatedDurationMinutes: number;
+  price: number;
 }
 
 export interface QueueEntry {
   id: number;
-  customer: Customer;
-  service: Service;
-  status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  queueNumber: number;
+  customerId: number;
+  employeeId?: number;
+  appointmentId?: number;
   estimatedWaitTime: number;
-  checkInTime: string;
-  priority: number;
+  status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
+  position: number;
   notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+  // Customer information (populated from customer entity)
+  customerName: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  // Employee information (populated from employee entity)
+  employeeName?: string;
+  // Legacy fields for backward compatibility
+  customer?: Customer;
+  service?: Service;
+  checkInTime?: string;
+  priority?: number;
 }
 
 export interface CheckInRequest {
@@ -342,9 +375,9 @@ class ApiService {
     });
   }
 
-  // Employee endpoints
+  // Employee endpoints (public - used for technician selection)
   async getEmployees(): Promise<Employee[]> {
-    return this.request<Employee[]>('/employees');
+    return this.publicRequest<Employee[]>('/employees');
   }
 
   async getEmployeeById(id: number): Promise<Employee> {
@@ -392,12 +425,12 @@ class ApiService {
 
   async createAppointment(bookingData: BookingData): Promise<ApiResponse<Appointment>> {
     try {
-      const appointmentRequest = {
+      // Build the booking request to match backend BookingRequestDTO
+      const bookingRequest = {
         customerName: bookingData.customerName,
         customerEmail: bookingData.customerEmail,
         customerPhone: bookingData.customerPhone,
         serviceId: bookingData.serviceId,
-        serviceName: bookingData.serviceName,
         staffId: bookingData.staffId,
         staffName: bookingData.staffName,
         scheduledTime: `${bookingData.appointmentDate}T${bookingData.appointmentTime}:00`,
@@ -407,9 +440,10 @@ class ApiService {
         status: bookingData.status
       };
 
-      const appointment = await this.request<Appointment>('/appointments', {
+      // Use /api/bookings endpoint which accepts customer info directly
+      const appointment = await this.publicRequest<Appointment>('/bookings', {
         method: 'POST',
-        body: JSON.stringify(appointmentRequest),
+        body: JSON.stringify(bookingRequest),
       });
       
       return {
@@ -463,9 +497,9 @@ class ApiService {
   }
 
   async updateQueueStatus(id: number, status: QueueEntry['status']): Promise<QueueEntry> {
-    return this.request<QueueEntry>(`/queue/${id}/status`, {
+    // Backend expects status as query param, not JSON body
+    return this.request<QueueEntry>(`/queue/${id}/status?status=${status}`, {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
     });
   }
 
@@ -475,8 +509,9 @@ class ApiService {
     });
   }
 
-  async getQueueStats(): Promise<{ totalWaiting: number; averageWaitTime: number }> {
-    return this.request<{ totalWaiting: number; averageWaitTime: number }>('/queue/stats');
+  async getQueueStats(): Promise<{ totalWaiting: number; averageWaitTime: number; longestWait?: number }> {
+    // Public endpoint - used by check-in page to show wait times
+    return this.publicRequest<{ totalWaiting: number; averageWaitTime: number; longestWait?: number }>('/queue/stats');
   }
 
   async refreshQueue(): Promise<void> {
@@ -485,53 +520,36 @@ class ApiService {
     });
   }
 
-  // Check-in endpoints (requires authentication)
+  // Check-in endpoints (public - for customer self-service kiosk)
   async checkIn(checkInData: CheckInRequestDTO): Promise<CheckInResponseDTO> {
-    try {
-      // Step 1: Create or get customer
-      const customerData = {
-        name: checkInData.name,
-        phoneNumber: checkInData.phoneNumber || '',
-        email: checkInData.email || ''
-      };
-      
-      const customer = await this.request<Customer>('/customers', {
-        method: 'POST',
-        body: JSON.stringify(customerData),
-      });
-
-      // Step 2: Add customer to queue (for now, return mock response)
-      // We'll need to find the correct queue endpoint
-      const mockResponse: CheckInResponseDTO = {
-        id: customer.id,
-        name: customer.name,
-        phoneNumber: customer.phoneNumber,
-        email: customer.email || '',
-        note: checkInData.notes || '',
-        guest: true,
-        checkedInAt: new Date().toISOString(),
-        message: 'Successfully checked in',
-        success: true,
-        estimatedWaitTime: 25,
-        queuePosition: 1,
-        queueId: Date.now() // Mock queue ID
-      };
-
-      return mockResponse;
-    } catch (error) {
-      console.error('Check-in error:', error);
-      throw error;
-    }
+    // Use the unified check-in endpoint that handles both guest and existing customers
+    // Backend expects: name, contact, phoneNumber, email, note, isGuest, requestedService
+    const requestBody = {
+      name: checkInData.name,
+      contact: checkInData.phoneNumber || checkInData.email || '',
+      phoneNumber: checkInData.phoneNumber || '',
+      email: checkInData.email || '',
+      note: checkInData.notes || '',
+      isGuest: checkInData.guest ?? true,
+      requestedService: checkInData.requestedService || ''
+    };
+    
+    return this.publicRequest<CheckInResponseDTO>('/checkin', {
+      method: 'POST',
+      body: JSON.stringify(requestBody),
+    });
   }
 
   async checkInExisting(phoneOrEmail: string): Promise<Customer> {
-    return this.request<Customer>(`/checkin/existing?phoneOrEmail=${encodeURIComponent(phoneOrEmail)}`, {
+    // Public endpoint for existing customer check-in
+    return this.publicRequest<Customer>(`/checkin/existing?phoneOrEmail=${encodeURIComponent(phoneOrEmail)}`, {
       method: 'POST',
     });
   }
 
   async checkInGuest(name: string, phoneNumber: string): Promise<Customer> {
-    return this.request<Customer>(`/checkin/guest?name=${encodeURIComponent(name)}&phoneNumber=${encodeURIComponent(phoneNumber)}`, {
+    // Public endpoint for guest check-in
+    return this.publicRequest<Customer>(`/checkin/guest?name=${encodeURIComponent(name)}&phoneNumber=${encodeURIComponent(phoneNumber)}`, {
       method: 'POST',
     });
   }
