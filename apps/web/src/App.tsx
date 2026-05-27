@@ -17,6 +17,7 @@ const BookingPage = lazy(() => import("./pages/BookingPage"));
 const ColorDemoPage = lazy(() => import("./pages/ColorDemoPage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const WaitListPage = lazy(() => import("./pages/WaitListPage"));
+const AdminSectionPlaceholder = lazy(() => import("./pages/AdminSectionPlaceholder"));
 
 function App() {
   return (
@@ -50,15 +51,46 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
-              <Route 
-                path="/admin/dashboard" 
+              <Route
+                path="/admin/dashboard"
                 element={
                   <ProtectedRoute requireAdmin={true}>
                     <AdminPage />
                   </ProtectedRoute>
-                } 
+                }
               />
-              
+
+              {/* Admin sub-routes — placeholders for tiles in AdminPage. */}
+              <Route path="/admin/checkins" element={
+                <ProtectedRoute requireAdmin={true}><Navigate to="/waitlist" replace /></ProtectedRoute>
+              } />
+              <Route path="/admin/staff" element={
+                <ProtectedRoute requireAdmin={true}>
+                  <AdminSectionPlaceholder title="Staff Management" description="Add, edit, and manage your team of technicians, front-desk staff, and managers. Currently you can use the seed users and modify roles via the backend." />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/bookings" element={
+                <ProtectedRoute requireAdmin={true}><Navigate to="/admin" replace /></ProtectedRoute>
+              } />
+              <Route path="/admin/analytics" element={
+                <ProtectedRoute requireAdmin={true}>
+                  <AdminSectionPlaceholder title="Analytics & Reports" description="Revenue trends, busy-hour heatmaps, technician utilization, and customer retention." />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/themes" element={
+                <ProtectedRoute requireAdmin={true}><Navigate to="/colors" replace /></ProtectedRoute>
+              } />
+              <Route path="/admin/payments" element={
+                <ProtectedRoute requireAdmin={true}>
+                  <AdminSectionPlaceholder title="Payments & Billing" description="Process payments, refunds, and view transaction history. Requires payment-processor integration (Stripe / Square)." />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/settings" element={
+                <ProtectedRoute requireAdmin={true}>
+                  <AdminSectionPlaceholder title="Settings" description="Salon hours, business info, notification preferences, and account settings." />
+                </ProtectedRoute>
+              } />
+
               {/* Testing Route (only in development) */}
               <Route path="/testing" element={<TestingGuide />} />
               

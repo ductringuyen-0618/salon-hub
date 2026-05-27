@@ -58,8 +58,10 @@ The system implements a four-tier role hierarchy (highest to lowest privilege):
 - `DELETE /api/customers/{id}` - **ADMIN only**
 
 ### Employee Management (`/api/employees`)
-- `GET /api/employees` - **MANAGER, ADMIN**
-- `GET /api/employees/{id}` - **MANAGER, ADMIN** (or self for any role)
+- `GET /api/employees` - **Public** (the booking and check-in pages let
+  anonymous customers pick a preferred technician; the list endpoint
+  intentionally returns name/role/availability only, no PII)
+- `GET /api/employees/{id}` - **TECHNICIAN, FRONT_DESK, MANAGER, ADMIN**
 - `POST /api/employees` - **ADMIN only**
 - `PUT /api/employees/{id}` - **ADMIN only**
 - `DELETE /api/employees/{id}` - **ADMIN only**
@@ -80,7 +82,8 @@ The system implements a four-tier role hierarchy (highest to lowest privilege):
 - `PUT /api/queue/{id}` - **FRONT_DESK, MANAGER, ADMIN**
 - `DELETE /api/queue/{id}` - **FRONT_DESK, MANAGER, ADMIN**
 - `PATCH /api/queue/{id}/status` - **FRONT_DESK, MANAGER, ADMIN**
-- `GET /api/queue/stats` - **MANAGER, ADMIN**
+- `GET /api/queue/stats` - **Public** (the public check-in page renders the
+  current wait time on this endpoint; only aggregates are exposed, no PII)
 - `POST /api/queue/refresh` - **FRONT_DESK, MANAGER, ADMIN**
 
 ### Check-in Management (`/api/checkin`)

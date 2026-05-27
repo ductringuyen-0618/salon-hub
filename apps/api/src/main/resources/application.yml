@@ -23,7 +23,10 @@ springdoc:
 # In dev a hardcoded fallback is acceptable; in prod JWT_SECRET MUST be set via env.
 # The previous committed secret was leaked publicly and has been rotated.
 jwt:
-  secret: ${JWT_SECRET:dev-only-secret-replace-in-prod-via-env-do-not-commit-real-secrets}
+  # The previous committed secret 404E63...66B5970 was leaked publicly and has been rotated.
+  # In prod set JWT_SECRET in the host env (Render/Fly dashboard). Dev fallback is hex
+  # because jjwt 0.11.x base64-decodes the secret string.
+  secret: ${JWT_SECRET:1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b}
   expiration: 86400000 # 24 hours in milliseconds
 
 # CORS allowed origins (comma-separated). Empty/unset = permissive (dev only).

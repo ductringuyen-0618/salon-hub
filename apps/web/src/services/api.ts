@@ -436,20 +436,27 @@ class ApiService {
 
   async createAppointment(bookingData: BookingData): Promise<ApiResponse<Appointment>> {
     try {
-      // Build the booking request to match backend BookingRequestDTO
-      const bookingRequest = {
+      // Build the booking request to match backend BookingRequestDTO.
+      // staffId is optional (null = any available). serviceIds carries
+      // multi-service bookings; serviceId is the primary.
+      const bookingRequest: any = {
         customerName: bookingData.customerName,
         customerEmail: bookingData.customerEmail,
         customerPhone: bookingData.customerPhone,
         serviceId: bookingData.serviceId,
-        staffId: bookingData.staffId,
-        staffName: bookingData.staffName,
         scheduledTime: `${bookingData.appointmentDate}T${bookingData.appointmentTime}:00`,
         duration: bookingData.duration,
         price: bookingData.price,
         notes: bookingData.notes || '',
-        status: bookingData.status
+        status: bookingData.status,
       };
+      if ((bookingData as any).serviceIds && (bookingData as any).serviceIds.length > 1) {
+        bookingRequest.serviceIds = (bookingData as any).serviceIds;
+      }
+      if (bookingData.staffId != null) {
+        bookingRequest.staffId = bookingData.staffId;
+        if (bookingData.staffName) bookingRequest.staffName = bookingData.staffName;
+      }
 
       // Use /api/bookings endpoint which accepts customer info directly
       const appointment = await this.publicRequest<Appointment>('/bookings', {

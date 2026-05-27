@@ -26,7 +26,7 @@ import {
   User,
   Loader2
 } from 'lucide-react';
-import { services, employees, generateTimeSlots } from '@/lib/bookingData';
+import { services as mockServices, employees as mockEmployees, generateTimeSlots } from '@/lib/bookingData';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -50,6 +50,42 @@ const BookingPage = () => {
   const [bookingComplete, setBookingComplete] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingData, setBookingData] = useState<any>(null);
+  // Real services/employees fetched from backend (replaces mock data so we
+  // send correct numeric IDs to /api/bookings). Falls back to mock if API
+  // is unreachable so the page still renders.
+  const [services, setServices] = useState<any[]>(mockServices);
+  const [employees, setEmployees] = useState<any[]>(mockEmployees);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [svc, emp] = await Promise.all([
+          apiService.getServices(),
+          apiService.getEmployees(),
+        ]);
+        if (cancelled) return;
+        // Normalize backend shape (numeric id, estimatedDurationMinutes) to
+        // the shape this component already expects (id as string for ===
+        // comparison, duration in minutes, price as number).
+        const svcMapped = (svc || []).map((s: any) => ({
+          ...s,
+          id: String(s.id),
+          duration: s.estimatedDurationMinutes ?? s.duration ?? 60,
+          price: typeof s.price === 'string' ? parseFloat(s.price) : s.price,
+        }));
+        const empMapped = (emp || []).map((e: any) => ({
+          ...e,
+          id: String(e.id),
+        }));
+        if (svcMapped.length > 0) setServices(svcMapped);
+        if (empMapped.length > 0) setEmployees(empMapped);
+      } catch (err) {
+        console.warn('Falling back to mock booking data — API unreachable:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const steps = [
     { id: 'services', title: 'Services', description: 'Choose your treatments' },
@@ -143,20 +179,33 @@ const BookingPage = () => {
         throw new Error('Please provide your contact information');
       }
 
-      // Use the first selected service and staff for the booking
+      // Use the first selected service. Resolve numeric IDs from the real
+      // backend lists (services and employees now come from /api/service-types
+      // and /api/employees). Staff is optional — null means "any available".
       const primaryService = selectedServicesDetails[0];
-      const selectedStaff = employees.find(emp => emp.id === selectedEmployee) || employees[0];
+      const primaryServiceId = Number(primaryService.id);
+      if (!Number.isFinite(primaryServiceId) || primaryServiceId <= 0) {
+        throw new Error('Selected service is not available. Please refresh and try again.');
+      }
 
-      // Format the booking data for the backend
+      const selectedStaff = selectedEmployee
+        ? employees.find(emp => emp.id === selectedEmployee)
+        : null;
+      const staffIdNum = selectedStaff ? Number(selectedStaff.id) : null;
+
+      // Format the booking data for the backend (BookingRequestDTO)
       const bookingData = {
         customerId: isAuthenticated && user ? user.id : null,
         customerName: customerInfo.name.trim(),
         customerEmail: customerInfo.email.trim(),
         customerPhone: customerInfo.phone.trim(),
-        serviceId: parseInt(primaryService.id) || 1, // Convert string ID to number
+        serviceId: primaryServiceId,
+        serviceIds: selectedServicesDetails
+          .map(s => Number(s.id))
+          .filter(n => Number.isFinite(n) && n > 0),
         serviceName: primaryService.name,
-        staffId: parseInt(selectedStaff.id) || 1, // Convert string ID to number
-        staffName: selectedStaff.name,
+        staffId: Number.isFinite(staffIdNum as number) && (staffIdNum as number) > 0 ? staffIdNum : null,
+        staffName: selectedStaff?.name,
         appointmentDate: format(selectedDate, 'yyyy-MM-dd'),
         appointmentTime: selectedTime,
         duration: getTotalDuration(),

@@ -6,6 +6,13 @@ import { tempo } from "tempo-devtools/dist/vite";
 // https://vitejs.dev/config/
 export default defineConfig({
   base: process.env.NODE_ENV === "development" ? "/" : process.env.VITE_BASE_PATH || "/",
+  // sockjs-client expects a browser `global` symbol (it's a Node-era library).
+  // Without this polyfill, importing it throws "ReferenceError: global is not
+  // defined" and crashes any page that uses the queue WebSocket — notably
+  // /waitlist. See QA finding #6.
+  define: {
+    global: "globalThis",
+  },
   optimizeDeps: {
     entries: ["src/main.tsx", "src/tempobook/**/*"],
   },

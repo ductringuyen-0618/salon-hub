@@ -1,6 +1,7 @@
 package com.salonhub.api.common.exception;
 
 import com.salonhub.api.common.dto.ErrorResponse;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -131,6 +132,21 @@ public class GlobalExceptionHandler {
         
         log.warn("State error: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    /**
+     * Handle missing entities — referenced resource (customer, employee,
+     * service, etc.) not found. Returns 404 instead of 500.
+     */
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleEntityNotFound(
+            EntityNotFoundException ex, WebRequest request) {
+
+        ErrorResponse response = ErrorResponse.notFound(ex.getMessage());
+        response.setPath(request.getDescription(false).replace("uri=", ""));
+
+        log.warn("Entity not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
     /**
