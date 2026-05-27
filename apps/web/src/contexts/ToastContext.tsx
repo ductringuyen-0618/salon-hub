@@ -83,6 +83,77 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   return (
     <ToastContext.Provider value={value}>
       {children}
+      <ToastViewport toasts={toasts} onClose={removeToast} />
     </ToastContext.Provider>
+  );
+};
+
+// Inline toast renderer. Previously the context tracked toasts in state but
+// nothing rendered them, so success/error/warning/info calls were silent.
+// Now every call to error("Booking failed") etc. actually shows on screen.
+const ToastViewport: React.FC<{ toasts: Toast[]; onClose: (id: string) => void }> = ({ toasts, onClose }) => {
+  if (toasts.length === 0) return null;
+  return (
+    <div
+      aria-live="polite"
+      aria-atomic="true"
+      style={{
+        position: 'fixed',
+        top: 16,
+        right: 16,
+        zIndex: 9999,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        maxWidth: 360,
+        pointerEvents: 'none',
+      }}
+    >
+      {toasts.map(t => {
+        const color =
+          t.type === 'error'   ? { bg: '#fef2f2', border: '#dc2626', text: '#991b1b' } :
+          t.type === 'success' ? { bg: '#f0fdf4', border: '#16a34a', text: '#166534' } :
+          t.type === 'warning' ? { bg: '#fffbeb', border: '#d97706', text: '#92400e' } :
+                                 { bg: '#eff6ff', border: '#2563eb', text: '#1e40af' };
+        return (
+          <div
+            key={t.id}
+            role="alert"
+            style={{
+              background: color.bg,
+              border: `1px solid ${color.border}`,
+              color: color.text,
+              borderRadius: 8,
+              padding: '12px 16px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+              pointerEvents: 'auto',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 12,
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600 }}>{t.title}</div>
+              {t.message && <div style={{ marginTop: 4, fontSize: 14, opacity: 0.9 }}>{t.message}</div>}
+            </div>
+            <button
+              onClick={() => onClose(t.id)}
+              aria-label="Dismiss"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: color.text,
+                cursor: 'pointer',
+                fontSize: 18,
+                lineHeight: 1,
+                padding: 0,
+              }}
+            >
+              ×
+            </button>
+          </div>
+        );
+      })}
+    </div>
   );
 };

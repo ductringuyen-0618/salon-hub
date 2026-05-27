@@ -549,7 +549,13 @@ const BookingPage = () => {
                             <div className="text-center">
                               <User className="h-8 w-8 mx-auto mb-2 text-dynamic-primary" />
                               <p className="font-medium text-dynamic-text">{employee.name}</p>
-                              <p className="text-xs text-dynamic-text-secondary">{employee.specialties.join(', ')}</p>
+                              <p className="text-xs text-dynamic-text-secondary">
+                                {(employee.specialties && employee.specialties.length > 0)
+                                  ? employee.specialties.join(', ')
+                                  : (employee.role
+                                    ? employee.role.replace('_', ' ').toLowerCase()
+                                    : 'Available')}
+                              </p>
                             </div>
                           </div>
                         ))}
