@@ -5,22 +5,21 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * Supabase Auth integration configuration.
  *
- * Activate by setting `supabase.jwt-secret` (env: SUPABASE_JWT_SECRET).
- * The other fields are diagnostic / future-use.
+ * Activated when `supabase.jwks-url` is set (env: SUPABASE_JWKS_URL).
+ * Tokens are verified against Supabase's published JWKS (ES256 asymmetric)
+ * via Spring Security's oauth2-resource-server.
  */
 @ConfigurationProperties(prefix = "supabase")
 public record SupabaseProperties(
-        /** Project URL, e.g. https://xxxx.supabase.co. Diagnostic only — the
-         *  backend doesn't call Supabase REST, it only verifies tokens. */
+        /** Project URL, e.g. https://xxxx.supabase.co. */
         String url,
 
-        /** The project's JWT signing secret. Available in Supabase dashboard
-         *  -> Project Settings -> API -> JWT Settings. HS256-shared with
-         *  Supabase's auth server. When unset, the legacy JwtService remains
-         *  the only authentication mechanism. */
-        String jwtSecret,
+        /** JWKS endpoint. Typically
+         *  https://<project>.supabase.co/auth/v1/.well-known/jwks.json
+         *  Setting this enables Supabase-based authentication. */
+        String jwksUrl,
 
-        /** Issuer claim Supabase puts on tokens; defaults to <url>/auth/v1.
-         *  Used as a defense-in-depth check on incoming tokens. */
+        /** Expected `iss` claim on incoming tokens. Defaults to
+         *  <url>/auth/v1. Used as a defense-in-depth check. */
         String issuer
 ) {}

@@ -1,6 +1,8 @@
 package com.salonhub.api.auth.config;
 
+import com.salonhub.api.auth.supabase.SupabaseJwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -34,6 +36,14 @@ public class SecurityConfiguration {
      */
     @Value("${salon-hub.cors.allowed-origins:}")
     private String allowedOriginsCsv;
+
+    /**
+     * When SUPABASE_JWKS_URL is set, the Spring oauth2-resource-server filter
+     * auto-configures and we wire its JWT → User converter here. When not set,
+     * this bean is absent and we fall back to the legacy JwtAuthenticationFilter.
+     */
+    @Autowired(required = false)
+    private SupabaseJwtAuthenticationFilter supabaseJwtConverter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -100,8 +110,21 @@ public class SecurityConfiguration {
                                 .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationProvider(authenticationProvider)
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .authenticationProvider(authenticationProvider);
+
+        if (supabaseJwtConverter != null) {
+            // Supabase JWKS is configured — accept Supabase-issued JWTs.
+            // Spring auto-configures the JwtDecoder from spring.security.oauth2.
+            // resourceserver.jwt.jwk-set-uri in application.yml.
+            http.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
+                    jwt.jwtAuthenticationConverter(supabaseJwtConverter)));
+        }
+
+        // Always also register the legacy JwtAuthenticationFilter so seeded test
+        // users (admin@salonhub.com etc., signed with the local JWT secret)
+        // keep working during the migration. Once all clients are on Supabase
+        // this filter will be removed.
+        http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

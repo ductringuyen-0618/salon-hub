@@ -19,18 +19,23 @@ import {
 } from "lucide-react";
 
 const LoginPage = () => {
-  const { isAuthenticated, loading } = useAuth();
+  // `initializing` is true ONLY during the very first session check on
+  // page load. We must NOT use `loading` here — that flag goes true during
+  // an in-flight login attempt, which would unmount the form mid-submit and
+  // discard its error state (causing the wrong-password silent-failure bug).
+  const { isAuthenticated, initializing } = useAuth();
   const navigate = useNavigate();
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (!loading && isAuthenticated) {
+    if (!initializing && isAuthenticated) {
       navigate('/', { replace: true });
     }
-  }, [isAuthenticated, loading, navigate]);
+  }, [isAuthenticated, initializing, navigate]);
 
-  // Show loading while checking authentication
-  if (loading) {
+  // Show loading ONLY during the initial session check, never during a
+  // user-initiated login attempt.
+  if (initializing) {
     return (
       <div className="min-h-screen bg-dynamic-background flex items-center justify-center">
         <div className="text-center">

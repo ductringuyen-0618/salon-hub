@@ -135,15 +135,25 @@ public class AuthenticationController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<AuthenticationResponse> getCurrentUser(
-            @RequestHeader("Authorization") String authHeader
-    ) {
-        try {
-            // Extract email from JWT token or use SecurityContext
-            // For now, this is a placeholder - you'd extract from the JWT
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+    public ResponseEntity<AuthenticationResponse> getCurrentUser() {
+        // The authenticated principal is set by either the legacy
+        // JwtAuthenticationFilter (returns a UserDetails) or the new
+        // SupabaseJwtAuthenticationFilter (returns our User entity).
+        var auth = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).build();
         }
+
+        Object principal = auth.getPrincipal();
+        if (!(principal instanceof com.salonhub.api.auth.model.User u)) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED).build();
+        }
+
+        // No access_token here — caller already has their own (Supabase or legacy).
+        // /api/auth/me returns just the user record.
+        AuthenticationResponse resp = new AuthenticationResponse(null, u);
+        resp.setTokenType(null);
+        return ResponseEntity.ok(resp);
     }
 }

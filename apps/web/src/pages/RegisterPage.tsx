@@ -17,7 +17,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { apiService } from "@/services/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   Crown, 
   Star, 
@@ -75,27 +75,27 @@ const RegisterPage = () => {
     },
   });
 
+  const { register: registerUser } = useAuth();
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       setIsLoading(true);
       setError("");
-      
-      const response = await apiService.register({
+
+      // Supabase Auth owns the password; the backend's
+      // SupabaseJwtAuthenticationFilter provisions a local User row with
+      // role=CUSTOMER on the user's first authenticated request.
+      await registerUser({
         name: `${values.firstName} ${values.lastName}`,
         email: values.email,
         phoneNumber: values.phone,
         password: values.password,
-        role: 'CUSTOMER',
       });
 
-      if (response.access_token) {
-        setSuccess(true);
-        setTimeout(() => {
-          navigate("/login");
-        }, 2000);
-      } else {
-        setError("Registration failed. Please try again.");
-      }
+      // If email confirmation is enabled in Supabase, AuthContext will have
+      // set an error like "Check your email...". Otherwise we're signed in.
+      setSuccess(true);
+      setTimeout(() => navigate("/"), 1800);
     } catch (err: any) {
       setError(err.message || "An error occurred during registration. Please try again.");
     } finally {
