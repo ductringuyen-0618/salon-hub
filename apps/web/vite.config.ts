@@ -31,21 +31,25 @@ export default defineConfig({
     allowedHosts: true,
   },
   build: {
-    chunkSizeWarningLimit: 600,
+    chunkSizeWarningLimit: 1200,
+    // NOTE: an earlier version of this config split React, Radix, and a
+    // generic "vendor" catchall into separate manualChunks. That created a
+    // circular dependency between vendor <-> react-vendor and crashed the
+    // PRODUCTION bundle with "Cannot access 'qt' before initialization"
+    // (TDZ ReferenceError). We now only split a few standalone libraries
+    // that don't share state with React internals — leaving React and
+    // anything that depends on it in the default chunk.
     rollupOptions: {
       output: {
-        // Split heavy vendor groups into their own chunks so the main bundle
-        // stays well under 500 kB and first paint improves.
         manualChunks: (id) => {
           if (!id.includes("node_modules")) return undefined;
-          if (id.includes("@radix-ui")) return "radix";
-          if (id.includes("react-router") || id.includes("react-dom") || id.includes("/react/")) return "react-vendor";
+          // Standalone, no React dependency in their init paths:
           if (id.includes("@supabase")) return "supabase";
-          if (id.includes("framer-motion")) return "framer";
-          if (id.includes("recharts") || id.includes("d3")) return "charts";
-          if (id.includes("lucide-react") || id.includes("react-icons")) return "icons";
           if (id.includes("@stomp") || id.includes("sockjs-client")) return "websocket";
-          return "vendor";
+          if (id.includes("recharts") || id.includes("d3")) return "charts";
+          // Everything else (React + Radix + framer + icons + utils) goes
+          // into the default chunk. Larger but correct.
+          return undefined;
         },
       },
     },
