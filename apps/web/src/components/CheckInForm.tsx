@@ -98,34 +98,24 @@ const CheckInForm = () => {
     const checkInResults: {name: string, queuePosition?: number}[] = [];
 
     try {
-      // Ensure user is authenticated (auto-login for demo)
-      if (!isAuthenticated) {
-        console.log('User not authenticated, attempting auto-login...');
-        try {
-          const loginResponse = await apiService.login({
-            email: 'admin@salonhub.com',
-            password: 'admin123'
-          });
-          console.log('Auto-login successful:', loginResponse);
-          // The AuthContext will handle the token storage
-        } catch (loginError) {
-          console.error('Auto-login failed:', loginError);
-          throw new Error('Authentication required for check-in');
-        }
-        // Wait a moment for auth context to update
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
+      // /api/checkin is documented as PUBLIC (see SECURITY-PERMISSIONS.md).
+      // Guest check-in must NOT require any login. Previously this block
+      // auto-logged-in with hardcoded admin credentials shipped in the JS
+      // bundle — a serious leak. That has been removed.
 
-      // Prepare check-in data
+      // Prepare check-in data. The backend's CheckInRequestDTO requires a
+      // single `contact` field (phone or email); api.ts maps from these.
+      const isEmail = values.contact.includes('@');
       const checkInData = {
         name: values.name,
-        phoneNumber: values.contact.includes('@') ? null : values.contact,
-        email: values.contact.includes('@') ? values.contact : null,
+        phoneNumber: isEmail ? '' : values.contact,
+        email: isEmail ? values.contact : '',
         preferredTechnician: values.technician,
         partySize: 1 + additionalPeople.length,
         additionalPeople: additionalPeople.map(person => ({ name: person.name })),
-        notes: '', // Add notes field
-        requestedService: '' // Add requested service field
+        notes: '',
+        requestedService: '',
+        guest: true,
       };
 
       console.log('Submitting check-in data:', checkInData);
