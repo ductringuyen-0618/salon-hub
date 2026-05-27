@@ -19,6 +19,12 @@ node_modules/
 *.pem
 *.key
 
+# ---- Local runtime logs (api/web bootRun dumps) ----
+.api-boot.log
+.api-boot.log.err
+.web-boot.log
+.web-boot.log.err
+
 # ---- apps/api (Spring Boot / Gradle) ----
 apps/api/build/
 apps/api/bin/
