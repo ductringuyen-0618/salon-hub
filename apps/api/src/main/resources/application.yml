@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/salon_hub
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+  flyway:
+    clean-disabled: false
+    baseline-on-migrate: true
+    locations: classpath:db/migration  # PostgreSQL migrations
+server:
+    port: 8082
+springdoc:
+  packages-to-scan:
+    - com.salonhub.api
+
+# JWT Configuration
+jwt:
+  secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+  expiration: 86400000 # 24 hours in milliseconds

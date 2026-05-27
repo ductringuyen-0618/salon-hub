@@ -1,0 +1,33 @@
+spring:
+  datasource:
+    username: test
+    password: test
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop   # Create tables for tests, drop after
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: false
+    locations: classpath:db/migration  # Use PostgreSQL migrations for tests
+    clean-disabled: false
+    clean-on-validation-error: true
+  jackson:
+    deserialization:
+      FAIL_ON_UNKNOWN_PROPERTIES: false
+    serialization:
+      WRITE_ENUMS_USING_TO_STRING: true
+  security:
+    enabled: false
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+# JWT Configuration for tests
+jwt:
+  secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+  expiration: 86400000

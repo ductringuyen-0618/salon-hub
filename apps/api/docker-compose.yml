@@ -1,0 +1,28 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: salon_hub
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    depends_on:
+      - db
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/salon_hub
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+    ports:
+      - "8082:8082"
+    restart: unless-stopped  # Changed from 'always' to prevent conflicts
+
+volumes:
+  db_data:

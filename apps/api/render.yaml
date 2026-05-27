@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: salon-hub-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free # or starter/standard based on your needs
+    buildCommand: ./gradlew bootJar
+    envVars:
+      - key: SALON_HUB_ENV
+        value: prod
+      - key: DB_PASSWORD
+        value: G4MU5sqgq43pvshvcYMVQbqaphCIqthg
+      - key: JWT_SECRET
+        value: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+    healthCheckPath: /actuator/health
+
+databases:
+  - name: salon-hub-db
+    databaseName: salon_hub
+    user: salon_hub_api
+    plan: free # PostgreSQL database

@@ -1,0 +1,56 @@
+spring:
+  datasource:
+    url: ${DATABASE_JDBC_URL:jdbc:postgresql://dpg-d5tdk9qli9vc73a64s7g-a:5432/salon_hub_db}
+    username: ${DB_USERNAME:salon_hub_db_user}
+    password: ${DB_PASSWORD:QBWod9kEt9K3ZyiQ9nZOGvRN1XijA119}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      connection-timeout: 60000
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    properties:
+      hibernate:
+        format_sql: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+    clean-disabled: false
+    locations: classpath:db/migration
+
+flyway:
+  force-clean: ${FLYWAY_FORCE_CLEAN:false}
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+springdoc:
+  packages-to-scan:
+    - com.salonhub.api
+
+jwt:
+  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+  expiration: 86400000
+
+logging:
+  level:
+    com.salonhub.api: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN

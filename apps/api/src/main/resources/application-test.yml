@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+  h2:
+    console:
+      enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+  flyway:
+    enabled: false
+server:
+  port: 8082
+springdoc:
+  packages-to-scan:
+    - com.salonhub.api
+
+# JWT Configuration
+jwt:
+  secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+  expiration: 86400000 # 24 hours in milliseconds
