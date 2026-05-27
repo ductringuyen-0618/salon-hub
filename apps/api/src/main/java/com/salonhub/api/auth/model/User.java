@@ -17,6 +17,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(name = "users")
@@ -39,10 +40,19 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String name;
 
-    @NotBlank(message = "Password is required")
+    // Password is optional once Supabase is in charge of auth (the password
+    // lives in Supabase's auth.users, not here). Kept on the entity so the
+    // legacy JwtService still works during the transition.
     @Size(min = 6, message = "Password must be at least 6 characters")
-    @Column(nullable = false)
+    @Column
     private String password;
+
+    /**
+     * Supabase Auth user UUID. Populated when a Supabase JWT first arrives
+     * for this user. Nullable on legacy seeded users until they're migrated.
+     */
+    @Column(name = "supabase_user_id", unique = true)
+    private UUID supabaseUserId;
 
     @Size(max = 20, message = "Phone number must be less than 20 characters")
     private String phoneNumber;
