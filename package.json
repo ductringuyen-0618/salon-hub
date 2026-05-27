@@ -1,0 +1,20 @@
+{
+  "name": "salon-hub",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Monorepo for salon-hub backend (apps/api) and frontend (apps/web).",
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm:api:dev\" \"npm:web:dev\"",
+    "api:dev": "cd apps/api && gradlew bootRun",
+    "api:build": "cd apps/api && gradlew build",
+    "api:test": "cd apps/api && gradlew test",
+    "web:install": "cd apps/web && npm install",
+    "web:dev": "cd apps/web && npm run dev",
+    "web:build": "cd apps/web && npm run build",
+    "web:test": "cd apps/web && npm test",
+    "web:lint": "cd apps/web && npm run lint"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}

@@ -1,0 +1,31 @@
+# ---- Root ----
+node_modules/
+.DS_Store
+*.log
+
+# ---- IDE / editors ----
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# ---- Env files (apps keep their own .env.example committed) ----
+.env
+.env.local
+.env.*.local
+
+# ---- apps/api (Spring Boot / Gradle) ----
+apps/api/build/
+apps/api/bin/
+apps/api/.gradle/
+apps/api/out/
+apps/api/target/
+apps/api/*.class
+
+# ---- apps/web (Vite / Node) ----
+apps/web/node_modules/
+apps/web/dist/
+apps/web/.vite/
+apps/web/coverage/
+apps/web/.vercel/
+apps/web/.next/
