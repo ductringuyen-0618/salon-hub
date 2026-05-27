@@ -1,14 +1,24 @@
-name: CI - Build & Test Backend
+name: API CI — Build & Test Backend
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - '.github/workflows/api-ci.yml'
   pull_request:
-    branches: [ main ]
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - '.github/workflows/api-ci.yml'
 
 jobs:
   build-test:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: apps/api
 
     services:
       postgres:
@@ -31,7 +41,7 @@ jobs:
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
-        
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -44,7 +54,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('apps/api/**/*.gradle*', 'apps/api/**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
 
@@ -74,7 +84,7 @@ jobs:
         if: success()
         with:
           name: jar-artifacts
-          path: build/libs/*.jar
+          path: apps/api/build/libs/*.jar
           retention-days: 30
 
       - name: Upload test results
@@ -83,6 +93,6 @@ jobs:
         with:
           name: test-results
           path: |
-            build/test-results/
-            build/reports/
+            apps/api/build/test-results/
+            apps/api/build/reports/
           retention-days: 30

@@ -2,9 +2,9 @@ name: Keep Render Alive
 
 on:
   schedule:
-    # Run every 5 minutes to keep Render free tier warm
+    # Every 5 minutes — keeps the Render free tier warm
     - cron: '*/5 * * * *'
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
 
 jobs:
   ping:
@@ -16,7 +16,7 @@ jobs:
           response=$(curl -s -o /dev/null -w "%{http_code}" https://salon-hub-api.onrender.com/actuator/health)
           echo "Response code: $response"
           if [ "$response" = "200" ]; then
-            echo "✅ App is healthy!"
+            echo "App is healthy"
           else
-            echo "⚠️ App returned $response - may be starting up"
+            echo "App returned $response - may be starting up"
           fi

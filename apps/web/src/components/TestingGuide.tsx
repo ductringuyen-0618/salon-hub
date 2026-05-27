@@ -372,7 +372,7 @@ const TestingGuide = () => {
                 <h4 className="font-medium mb-2">Environment Variables</h4>
                 <div className="space-y-2 text-sm">
                   <div><code>VITE_USE_MOCK_API</code> - Toggle mock API (true/false)</div>
-                  <div><code>VITE_API_BASE</code> - Backend API URL</div>
+                  <div><code>VITE_API_URL</code> - Backend API URL</div>
                   <div><code>VITE_BASE_PATH</code> - Application base path</div>
                 </div>
               </Card>

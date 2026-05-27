@@ -14,6 +14,11 @@ node_modules/
 .env.local
 .env.*.local
 
+# ---- Secret scratch files ----
+.NEW_JWT_SECRET.txt
+*.pem
+*.key
+
 # ---- apps/api (Spring Boot / Gradle) ----
 apps/api/build/
 apps/api/bin/

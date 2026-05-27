@@ -6,12 +6,34 @@ services:
     plan: free # or starter/standard based on your needs
     buildCommand: ./gradlew bootJar
     envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
       - key: SALON_HUB_ENV
         value: prod
+      # PORT is injected automatically by Render and read by application-prod.yml
+      # DATABASE_URL, DB_USERNAME, DB_PASSWORD are auto-populated from the
+      # provisioned Postgres database below.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: salon-hub-db
+          property: connectionString
+      - key: DB_USERNAME
+        fromDatabase:
+          name: salon-hub-db
+          property: user
       - key: DB_PASSWORD
-        value: G4MU5sqgq43pvshvcYMVQbqaphCIqthg
+        fromDatabase:
+          name: salon-hub-db
+          property: password
+      # JWT_SECRET must be set in the Render dashboard. Use `openssl rand -hex 32`
+      # or `[System.Security.Cryptography.RandomNumberGenerator]::Create()` to
+      # generate a 256-bit secret. Never commit the value.
       - key: JWT_SECRET
-        value: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+        sync: false
+      # Comma-separated list of allowed CORS origins
+      # e.g. "https://salon-hub.vercel.app,https://www.example.com"
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
     healthCheckPath: /actuator/health
 
 databases:

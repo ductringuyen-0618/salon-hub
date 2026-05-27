@@ -229,24 +229,32 @@ class ApiService {
       if (response.status === 401 || response.status === 403) {
         // Clear invalid session
         tokenStorage.clearSession();
-        
-        // Try to get error message from response
+
+        // Always include a stable "Authentication failed: <status>" prefix so
+        // callers (and tests) can pattern-match without depending on the
+        // backend's specific message text.
         const contentType = response.headers.get('content-type');
+        let detail = response.statusText;
         if (contentType && contentType.includes('application/json')) {
-          const errorData = await response.json() as ApiErrorResponse;
-          throw new Error(errorData.message || `Authentication failed: ${response.status} ${response.statusText}`);
+          try {
+            const errorData = await response.json() as ApiErrorResponse;
+            if (errorData.message) detail = errorData.message;
+          } catch { /* ignore body parse errors */ }
         }
-        throw new Error(`Authentication failed: ${response.status} ${response.statusText}`);
+        throw new Error(`Authentication failed: ${response.status} - ${detail}`);
       }
-      
+
       if (!response.ok) {
-        // Try to get error message from response
+        // Always prefix with "API Error: <status>" for consistent logging.
         const contentType = response.headers.get('content-type');
+        let detail = response.statusText;
         if (contentType && contentType.includes('application/json')) {
-          const errorData = await response.json() as ApiErrorResponse;
-          throw new Error(errorData.message || `API Error: ${response.status} ${response.statusText}`);
+          try {
+            const errorData = await response.json() as ApiErrorResponse;
+            if (errorData.message) detail = errorData.message;
+          } catch { /* ignore body parse errors */ }
         }
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        throw new Error(`API Error: ${response.status} - ${detail}`);
       }
 
       // Handle empty responses
@@ -280,13 +288,16 @@ class ApiService {
       const response = await fetch(url, config);
       
       if (!response.ok) {
-        // Try to get error message from response
+        // Always prefix with "API Error: <status>" for consistent logging.
         const contentType = response.headers.get('content-type');
+        let detail = response.statusText;
         if (contentType && contentType.includes('application/json')) {
-          const errorData = await response.json() as ApiErrorResponse;
-          throw new Error(errorData.message || `API Error: ${response.status} ${response.statusText}`);
+          try {
+            const errorData = await response.json() as ApiErrorResponse;
+            if (errorData.message) detail = errorData.message;
+          } catch { /* ignore body parse errors */ }
         }
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        throw new Error(`API Error: ${response.status} - ${detail}`);
       }
 
       // Handle empty responses
@@ -294,7 +305,7 @@ class ApiService {
       if (contentType && contentType.includes('application/json')) {
         return await response.json();
       }
-      
+
       return {} as T;
     } catch (error) {
       console.error('Public API request failed:', error);

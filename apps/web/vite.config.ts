@@ -22,5 +22,25 @@ export default defineConfig({
   server: {
     // @ts-ignore
     allowedHosts: true,
-  }
+  },
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        // Split heavy vendor groups into their own chunks so the main bundle
+        // stays well under 500 kB and first paint improves.
+        manualChunks: (id) => {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("@radix-ui")) return "radix";
+          if (id.includes("react-router") || id.includes("react-dom") || id.includes("/react/")) return "react-vendor";
+          if (id.includes("@supabase")) return "supabase";
+          if (id.includes("framer-motion")) return "framer";
+          if (id.includes("recharts") || id.includes("d3")) return "charts";
+          if (id.includes("lucide-react") || id.includes("react-icons")) return "icons";
+          if (id.includes("@stomp") || id.includes("sockjs-client")) return "websocket";
+          return "vendor";
+        },
+      },
+    },
+  },
 });
