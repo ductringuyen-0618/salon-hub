@@ -68,3 +68,14 @@ This repo was created by merging two previously separate repositories:
 - `salon-hub-ui-v2` → `apps/web`
 
 Full commit history from both repos has been preserved via `git subtree`.
+
+## Deployment targets
+
+- **API (apps/api)**: Fly.io — see `apps/api/fly.toml`. Uses Fly Postgres for
+  the database. Deploy with `flyctl deploy` from `apps/api/`.
+- **Web (apps/web)**: Vercel. Vercel's "Root Directory" project setting must
+  point to `apps/web/`. `apps/web/vercel.json` configures the rewrite for SPA
+  routing.
+- **Auth**: Supabase (planned). Migration in progress — replacing the legacy
+  custom Spring JWT with Supabase Auth so the frontend can use email +
+  Google OAuth + magic links without the backend owning passwords.
