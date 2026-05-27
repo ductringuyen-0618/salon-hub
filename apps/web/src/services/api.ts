@@ -542,13 +542,18 @@ class ApiService {
   async checkIn(checkInData: CheckInRequestDTO): Promise<CheckInResponseDTO> {
     // Use the unified check-in endpoint that handles both guest and existing customers
     // Backend expects: name, contact, phoneNumber, email, note, isGuest, requestedService
+    // Backend's CheckInRequestDTO uses `boolean isGuest` with Lombok @Data,
+    // which generates setGuest(...) — Jackson deserializes the JSON property
+    // `guest`, NOT `isGuest`. Sending `isGuest:true` would leave the flag
+    // false on the server, causing the request to fall into the
+    // find-existing-customer branch and 400.
     const requestBody = {
       name: checkInData.name,
       contact: checkInData.phoneNumber || checkInData.email || '',
       phoneNumber: checkInData.phoneNumber || '',
       email: checkInData.email || '',
       note: checkInData.notes || '',
-      isGuest: checkInData.guest ?? true,
+      guest: checkInData.guest ?? true,
       requestedService: checkInData.requestedService || ''
     };
     
