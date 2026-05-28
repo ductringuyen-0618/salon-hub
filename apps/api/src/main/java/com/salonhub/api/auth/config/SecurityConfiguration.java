@@ -151,8 +151,11 @@ public class SecurityConfiguration {
             configuration.setAllowedOrigins(origins);
         }
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        // setAllowedHeaders("*") already allows X-Tenant-Slug; keep explicit
+        // for clarity. Authorization stays exposed for clients reading
+        // refreshed JWTs back.
         configuration.setAllowedHeaders(List.of("*"));
-        configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setExposedHeaders(List.of("Authorization", "X-Tenant-Slug"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

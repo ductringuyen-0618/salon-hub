@@ -49,20 +49,26 @@ public class QueueDatabaseDefault {
         "Waiting for available stylist"
     );
     
-    // Set IDs manually for test fixtures
+    public static final Long TENANT_ID = 1L;
+
+    // Set IDs + tenant manually for test fixtures
     static {
         QUEUE_ENTRY_1.setId(QUEUE_ID_1);
+        QUEUE_ENTRY_1.setTenantId(TENANT_ID);
         QUEUE_ENTRY_2.setId(QUEUE_ID_2);
+        QUEUE_ENTRY_2.setTenantId(TENANT_ID);
         QUEUE_ENTRY_3.setId(QUEUE_ID_3);
+        QUEUE_ENTRY_3.setTenantId(TENANT_ID);
     }
-    
+
     public static final List<Queue> QUEUE_LIST = List.of(QUEUE_ENTRY_1, QUEUE_ENTRY_2, QUEUE_ENTRY_3);
-    
+
     public static final List<String> SQL = QUEUE_LIST.stream()
         .map(q -> String.format(
-            "INSERT INTO queue (id, customer_id, employee_id, appointment_id, queue_number, status, estimated_wait_time, notes) VALUES (%d, %d, %s, %s, %d, '%s', %s, '%s');",
-            q.getId(), 
-            q.getCustomerId(), 
+            "INSERT INTO queue (id, tenant_id, customer_id, employee_id, appointment_id, queue_number, status, estimated_wait_time, notes) VALUES (%d, %d, %d, %s, %s, %d, '%s', %s, '%s');",
+            q.getId(),
+            TENANT_ID,
+            q.getCustomerId(),
             q.getEmployeeId() != null ? q.getEmployeeId().toString() : "NULL",
             q.getAppointmentId() != null ? q.getAppointmentId().toString() : "NULL",
             q.getQueueNumber(),

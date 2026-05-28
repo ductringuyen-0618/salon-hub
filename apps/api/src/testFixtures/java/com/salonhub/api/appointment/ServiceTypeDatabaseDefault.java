@@ -38,16 +38,16 @@ public class ServiceTypeDatabaseDefault {
     
     // SQL insert statements for test data (with new columns)
     public static final String INSERT_SIGNATURE_MANICURE = 
-        "INSERT INTO service_types (id, name, estimated_duration_minutes, price, description, category, popular, active) VALUES " +
-        "(1, 'Signature Manicure', 60, 45.00, 'Complete nail care with cuticle treatment, shaping, and luxury hand massage', 'Manicure Services', true, true)";
+        "INSERT INTO service_types (id, tenant_id, name, estimated_duration_minutes, price, description, category, popular, active) VALUES" +
+        "(1, 1, 'Signature Manicure', 60, 45.00, 'Complete nail care with cuticle treatment, shaping, and luxury hand massage', 'Manicure Services', true, true)";
         
     public static final String INSERT_EXPRESS_MANICURE = 
-        "INSERT INTO service_types (id, name, estimated_duration_minutes, price, description, category, popular, active) VALUES " +
-        "(2, 'Express Manicure', 30, 25.00, 'Quick nail shaping, cuticle care, and polish application', 'Manicure Services', false, true)";
+        "INSERT INTO service_types (id, tenant_id, name, estimated_duration_minutes, price, description, category, popular, active) VALUES" +
+        "(2, 1, 'Express Manicure', 30, 25.00, 'Quick nail shaping, cuticle care, and polish application', 'Manicure Services', false, true)";
     
     public static final String INSERT_DELUXE_PEDICURE = 
-        "INSERT INTO service_types (id, name, estimated_duration_minutes, price, description, category, popular, active) VALUES " +
-        "(3, 'Deluxe Pedicure', 75, 65.00, 'Ultimate foot treatment with exfoliation, hot stone massage, and paraffin', 'Pedicure Services', true, true)";
+        "INSERT INTO service_types (id, tenant_id, name, estimated_duration_minutes, price, description, category, popular, active) VALUES" +
+        "(3, 1, 'Deluxe Pedicure', 75, 65.00, 'Ultimate foot treatment with exfoliation, hot stone massage, and paraffin', 'Pedicure Services', true, true)";
     
     // Legacy IDs for backward compatibility with existing tests
     public static final Long HAIRCUT_ID = SIGNATURE_MANICURE_ID;

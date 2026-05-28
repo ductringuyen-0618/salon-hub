@@ -1,17 +1,23 @@
 package com.salonhub.api.appointment.model;
 
+import com.salonhub.api.tenant.TenantFilter;
+import com.salonhub.api.tenant.TenantStampListener;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "service_types")
+@Filter(name = TenantFilter.NAME, condition = "tenant_id = :tenantId")
+@EntityListeners(TenantStampListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -20,7 +26,10 @@ public class ServiceType {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
+
+    @Column(nullable = false)
     private String name;
 
     @Column(name = "estimated_duration_minutes", nullable = false)

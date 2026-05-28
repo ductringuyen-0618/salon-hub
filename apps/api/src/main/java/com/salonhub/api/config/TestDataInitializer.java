@@ -7,6 +7,9 @@ import com.salonhub.api.auth.repository.UserRepository;
 import com.salonhub.api.employee.model.Employee;
 import com.salonhub.api.employee.model.Role;
 import com.salonhub.api.employee.repository.EmployeeRepository;
+import com.salonhub.api.tenant.TenantContext;
+import com.salonhub.api.tenant.model.Tenant;
+import com.salonhub.api.tenant.repository.TenantRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -33,13 +36,34 @@ public class TestDataInitializer implements CommandLineRunner {
     private final UserRepository userRepository;
     private final ServiceTypeRepository serviceTypeRepository;
     private final EmployeeRepository employeeRepository;
+    private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
     public void run(String... args) throws Exception {
-        seedUsers();
-        seedServiceTypes();
-        seedEmployees();
+        // Ensure the default tenant exists (Flyway V10 creates this in Postgres
+        // but H2 dev mode uses Hibernate create-drop and skips Flyway, so we
+        // seed it here too).
+        seedDefaultTenant();
+        // Scope all seed inserts to the default tenant. The TenantStampListener
+        // picks this up from TenantContext and stamps tenant_id on each row.
+        TenantContext.runAs(TenantContext.DEFAULT_ID, () -> {
+            try {
+                seedUsers();
+                seedServiceTypes();
+                seedEmployees();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    private void seedDefaultTenant() {
+        if (tenantRepository.findById(TenantContext.DEFAULT_ID).isPresent()) return;
+        Tenant t = new Tenant("default", "Default Salon");
+        t.setId(TenantContext.DEFAULT_ID);
+        tenantRepository.save(t);
+        log.info("Seeded default tenant (id={}, slug=default)", TenantContext.DEFAULT_ID);
     }
 
     private void seedEmployees() {

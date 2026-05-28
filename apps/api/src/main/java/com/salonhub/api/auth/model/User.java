@@ -1,5 +1,7 @@
 package com.salonhub.api.auth.model;
 
+import com.salonhub.api.tenant.TenantFilter;
+import com.salonhub.api.tenant.TenantStampListener;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -9,6 +11,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -21,6 +24,8 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "users")
+@Filter(name = TenantFilter.NAME, condition = "tenant_id = :tenantId")
+@EntityListeners(TenantStampListener.class)
 @Data
 @Builder
 @NoArgsConstructor
@@ -30,6 +35,9 @@ public class User implements UserDetails {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
 
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")

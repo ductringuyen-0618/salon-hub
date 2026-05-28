@@ -215,6 +215,28 @@ class ApiService {
     this.baseURL = API_CONFIG.BASE_URL;
   }
 
+  /**
+   * Resolve the tenant slug for the current request. We prefer an explicit
+   * VITE_TENANT_SLUG (useful for dev), fall back to the first subdomain
+   * label in prod (e.g. `lisa.salon-hub.app` → `lisa`), and use "default"
+   * as the final fallback so existing single-tenant deployments keep
+   * working unchanged.
+   */
+  private resolveTenantSlug(): string {
+    const explicit = (import.meta as any).env?.VITE_TENANT_SLUG;
+    if (explicit) return String(explicit);
+    if (typeof window !== 'undefined' && window.location?.hostname) {
+      const host = window.location.hostname;
+      const parts = host.split('.');
+      // Treat first label as tenant slug only when there are 3+ labels and
+      // it isn't a known non-tenant prefix.
+      if (parts.length >= 3 && !['www', 'api'].includes(parts[0])) {
+        return parts[0];
+      }
+    }
+    return 'default';
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
@@ -223,6 +245,9 @@ class ApiService {
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
+        // Tenant slug header — backend's TenantResolutionFilter uses this
+        // to scope every query by tenant_id.
+        'X-Tenant-Slug': this.resolveTenantSlug(),
         ...options.headers,
       },
       ...options,
@@ -294,6 +319,9 @@ class ApiService {
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
+        // Same tenant scoping as authenticated requests — anonymous
+        // walk-ins still join the right tenant's queue.
+        'X-Tenant-Slug': this.resolveTenantSlug(),
         ...options.headers,
       },
       ...options,

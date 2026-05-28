@@ -1,24 +1,32 @@
 package com.salonhub.api.queue.model;
 
+import com.salonhub.api.tenant.TenantFilter;
+import com.salonhub.api.tenant.TenantStampListener;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "queue")
+@Filter(name = TenantFilter.NAME, condition = "tenant_id = :tenantId")
+@EntityListeners(TenantStampListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Queue {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
     
     @Column(name = "customer_id", nullable = false)
     private Long customerId;

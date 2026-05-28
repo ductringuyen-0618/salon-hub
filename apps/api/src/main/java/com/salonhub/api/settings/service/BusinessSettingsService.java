@@ -3,6 +3,7 @@ package com.salonhub.api.settings.service;
 import com.salonhub.api.settings.dto.BusinessSettingsDTO;
 import com.salonhub.api.settings.model.BusinessSettings;
 import com.salonhub.api.settings.repository.BusinessSettingsRepository;
+import com.salonhub.api.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,18 +29,22 @@ public class BusinessSettingsService {
 
     private final BusinessSettingsRepository repository;
 
-    /** In-memory cache. Cleared by update(). Initialized on first read. */
-    private volatile BusinessSettings cached;
+    /**
+     * Per-tenant cache. Cleared for a tenant on update. We don't cache the
+     * Tenant lookup itself — that's TenantInterceptor's job.
+     */
+    private final java.util.concurrent.ConcurrentHashMap<Long, BusinessSettings> cache
+            = new java.util.concurrent.ConcurrentHashMap<>();
 
     public BusinessSettings getCurrent() {
-        BusinessSettings local = cached;
-        if (local != null) return local;
-        synchronized (this) {
-            if (cached != null) return cached;
-            cached = repository.findById(BusinessSettingsRepository.SINGLETON_ID)
-                    .orElseGet(this::createDefault);
-            return cached;
-        }
+        Long tenantId = TenantContext.currentOrDefault();
+        BusinessSettings cached = cache.get(tenantId);
+        if (cached != null) return cached;
+
+        BusinessSettings loaded = repository.findByTenantId(tenantId)
+                .orElseGet(() -> createDefaultFor(tenantId));
+        cache.put(tenantId, loaded);
+        return loaded;
     }
 
     /** Convenience for callers that don't need the entity. */
@@ -52,16 +57,16 @@ public class BusinessSettingsService {
         BusinessSettings current = getCurrent();
         applyDto(current, dto);
         BusinessSettings saved = repository.save(current);
-        // Bust cache so subsequent reads see the new values.
-        cached = null;
+        // Invalidate the tenant's cache so subsequent reads see new values.
+        cache.remove(TenantContext.currentOrDefault());
         return saved;
     }
 
     /* ---------- helpers ---------- */
 
-    private BusinessSettings createDefault() {
+    private BusinessSettings createDefaultFor(Long tenantId) {
         BusinessSettings s = new BusinessSettings();
-        s.setId(BusinessSettingsRepository.SINGLETON_ID);
+        s.setTenantId(tenantId);
         s.setBusinessName("SalonHub");
         s.setTagline(null);
         s.setBusinessHours(defaultHoursMap());

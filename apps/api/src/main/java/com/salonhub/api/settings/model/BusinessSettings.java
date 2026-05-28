@@ -1,10 +1,15 @@
 package com.salonhub.api.settings.model;
 
+import com.salonhub.api.tenant.TenantFilter;
+import com.salonhub.api.tenant.TenantStampListener;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Filter;
+import org.hibernate.annotations.FilterDef;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.ParamDef;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
@@ -23,13 +28,20 @@ import java.util.Map;
  */
 @Entity
 @Table(name = "business_settings")
+@FilterDef(name = TenantFilter.NAME, parameters = @ParamDef(name = TenantFilter.PARAM, type = Long.class))
+@Filter(name = TenantFilter.NAME, condition = "tenant_id = :tenantId")
+@EntityListeners(TenantStampListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class BusinessSettings {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
 
     @Column(name = "business_name", nullable = false, length = 120)
     private String businessName;

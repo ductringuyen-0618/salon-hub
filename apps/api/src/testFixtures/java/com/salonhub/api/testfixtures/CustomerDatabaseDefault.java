@@ -6,22 +6,34 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class CustomerDatabaseDefault {
+    public static final Long TENANT_ID = 1L;
+
     public static final Long JANE_ID = 1L;
-    // Added phone number field
-    public static final Customer JANE = new Customer(JANE_ID, "Jane Doe", "jane@example.com", "555-0101");
+    public static final Customer JANE = build(JANE_ID, "Jane Doe", "jane@example.com", "555-0101");
 
     public static final Long JOHN_ID = 2L;
-    public static final Customer JOHN = new Customer(JOHN_ID, "John Smith", "john@salon.com", "555-0202");
+    public static final Customer JOHN = build(JOHN_ID, "John Smith", "john@salon.com", "555-0202");
 
     public static final List<Customer> CUSTOMERLIST = List.of(JANE, JOHN);
 
     public static final List<String> SQL = CUSTOMERLIST.stream()
         .map(c -> String.format(
-            "INSERT INTO customers (id, name, email, phone_number) VALUES (%d, '%s', '%s', '%s');",
-            c.getId(), c.getName(), c.getEmail(), c.getPhoneNumber()
+            "INSERT INTO customers (id, tenant_id, name, email, phone_number) VALUES (%d, %d, '%s', '%s', '%s');",
+            c.getId(), TENANT_ID, c.getName(), c.getEmail(), c.getPhoneNumber()
         ))
         .collect(Collectors.toList());
+
     public static void seed(JdbcTemplate jdbc) {
-            SQL.forEach(jdbc::execute);
-        }
+        SQL.forEach(jdbc::execute);
+    }
+
+    private static Customer build(Long id, String name, String email, String phone) {
+        Customer c = new Customer();
+        c.setId(id);
+        c.setTenantId(TENANT_ID);
+        c.setName(name);
+        c.setEmail(email);
+        c.setPhoneNumber(phone);
+        return c;
+    }
 }

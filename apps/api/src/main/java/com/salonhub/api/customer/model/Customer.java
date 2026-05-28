@@ -1,7 +1,10 @@
 package com.salonhub.api.customer.model;
 
+import com.salonhub.api.tenant.TenantFilter;
+import com.salonhub.api.tenant.TenantStampListener;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -11,12 +14,15 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "customers")
+@Filter(name = TenantFilter.NAME, condition = "tenant_id = :tenantId")
+@EntityListeners(TenantStampListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -26,7 +32,10 @@ public class Customer {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = true, unique = true)
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
+
+    @Column(nullable = true)
     private String email;
 
     @Column(nullable = false)
