@@ -2,6 +2,7 @@ import { Suspense, lazy } from "react";
 import { useRoutes, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ToastProvider } from "./contexts/ToastContext";
+import { SettingsProvider } from "./contexts/SettingsContext";
 import HomePage from "./components/HomePage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import routes from "tempo-routes";
@@ -18,9 +19,12 @@ const ColorDemoPage = lazy(() => import("./pages/ColorDemoPage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const WaitListPage = lazy(() => import("./pages/WaitListPage"));
 const AdminSectionPlaceholder = lazy(() => import("./pages/AdminSectionPlaceholder"));
+const AdminSettingsPage = lazy(() => import("./pages/AdminSettingsPage"));
+const AdminServicesPage = lazy(() => import("./pages/AdminServicesPage"));
 
 function App() {
   return (
+    <SettingsProvider>
     <AuthProvider>
       <ToastProvider>
         <Suspense
@@ -69,6 +73,11 @@ function App() {
                   <AdminSectionPlaceholder title="Staff Management" description="Add, edit, and manage your team of technicians, front-desk staff, and managers. Currently you can use the seed users and modify roles via the backend." />
                 </ProtectedRoute>
               } />
+              <Route path="/admin/services" element={
+                <ProtectedRoute requireAdmin={true}>
+                  <AdminServicesPage />
+                </ProtectedRoute>
+              } />
               <Route path="/admin/bookings" element={
                 <ProtectedRoute requireAdmin={true}><Navigate to="/admin" replace /></ProtectedRoute>
               } />
@@ -87,7 +96,7 @@ function App() {
               } />
               <Route path="/admin/settings" element={
                 <ProtectedRoute requireAdmin={true}>
-                  <AdminSectionPlaceholder title="Settings" description="Salon hours, business info, notification preferences, and account settings." />
+                  <AdminSettingsPage />
                 </ProtectedRoute>
               } />
 
@@ -107,6 +116,7 @@ function App() {
         </Suspense>
       </ToastProvider>
     </AuthProvider>
+    </SettingsProvider>
   );
 }
 

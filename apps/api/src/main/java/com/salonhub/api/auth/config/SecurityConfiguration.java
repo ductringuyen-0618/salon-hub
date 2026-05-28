@@ -66,6 +66,10 @@ public class SecurityConfiguration {
                                         // Service types (public for viewing)
                                         "/api/service-types",
                                         "/api/service-types/**",
+                                        // Business settings (public read for
+                                        // storefront name/hours/theme on
+                                        // first paint; write is admin-only).
+                                        "/api/settings",
                                         // Public booking endpoint (requires auth but any authenticated user can book)
                                         "/api/bookings",
                                         "/api/bookings/**",

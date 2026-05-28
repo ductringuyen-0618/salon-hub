@@ -4,7 +4,7 @@ import com.salonhub.api.appointment.model.Appointment;
 import com.salonhub.api.appointment.model.ServiceType;
 import com.salonhub.api.appointment.repository.AppointmentRepository;
 import com.salonhub.api.appointment.repository.ServiceTypeRepository;
-import com.salonhub.api.config.BusinessHoursProperties;
+import com.salonhub.api.settings.service.BusinessSettingsService;
 import com.salonhub.api.employee.model.Employee;
 import com.salonhub.api.employee.model.Role;
 import com.salonhub.api.employee.repository.EmployeeRepository;
@@ -21,10 +21,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -48,8 +46,7 @@ class WaitTimeEstimatorTest {
     @Mock EmployeeRepository employeeRepository;
     @Mock AppointmentRepository appointmentRepository;
     @Mock ServiceTypeRepository serviceTypeRepository;
-
-    private BusinessHoursProperties hours;
+    @Mock BusinessSettingsService businessSettings;
 
     @InjectMocks WaitTimeEstimator estimator;
 
@@ -57,20 +54,13 @@ class WaitTimeEstimatorTest {
     private static final LocalDateTime TUE_10AM = LocalDateTime.of(2026, 6, 2, 10, 0);
 
     @BeforeEach
-    void setupHours() {
-        hours = new BusinessHoursProperties(
-            LocalTime.of(9, 0),    // open
-            LocalTime.of(19, 0),   // close
-            5,                      // turnover minutes
-            Set.of()                // no closed days
-        );
-        // Re-inject the props since @Mock won't construct the record.
-        estimator = new WaitTimeEstimator(
-            queueRepository, employeeRepository, appointmentRepository,
-            serviceTypeRepository, hours
-        );
-        // Lenient defaults — some tests (e.g. no-staff) short-circuit and
-        // never reach these calls. Strict mode would flag them as unused.
+    void setupSettings() {
+        // Default settings: 9am-7pm every day, 5min turnover. Individual
+        // tests can override via lenient stubs when they need different hours.
+        lenient().when(businessSettings.getTurnoverMinutes()).thenReturn(5);
+        lenient().when(businessSettings.getHoursFor(any()))
+            .thenReturn(new BusinessSettingsService.DayHoursParsed(
+                LocalTime.of(9, 0), LocalTime.of(19, 0)));
         lenient().when(appointmentRepository.findByEmployeeIdAndStartTimeBetween(anyLong(), any(), any()))
             .thenReturn(List.of());
         lenient().when(queueRepository.findByStatus(QueueStatus.IN_PROGRESS)).thenReturn(List.of());

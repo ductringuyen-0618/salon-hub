@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import TopRightUserProfile from './TopRightUserProfile';
+import { useSettings } from '@/contexts/SettingsContext';
 import {
   ArrowLeft,
   Menu,
@@ -23,6 +24,7 @@ const Navigation: React.FC<NavigationProps> = ({
 }) => {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { settings } = useSettings();
 
   return (
     <header className="bg-dynamic-surface shadow-sm border-b border-dynamic-border relative">
@@ -44,7 +46,7 @@ const Navigation: React.FC<NavigationProps> = ({
             <div className="flex-shrink-0">
               <Link to="/">
                 <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-light text-dynamic-text hover:text-dynamic-primary transition-colors tracking-wide">
-                  {title || 'Five Nails & Spa'}
+                  {title || settings.businessName || 'SalonHub'}
                 </h1>
               </Link>
               {subtitle && (

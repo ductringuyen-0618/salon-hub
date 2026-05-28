@@ -4,7 +4,7 @@ import com.salonhub.api.appointment.model.Appointment;
 import com.salonhub.api.appointment.model.ServiceType;
 import com.salonhub.api.appointment.repository.AppointmentRepository;
 import com.salonhub.api.appointment.repository.ServiceTypeRepository;
-import com.salonhub.api.config.BusinessHoursProperties;
+import com.salonhub.api.settings.service.BusinessSettingsService;
 import com.salonhub.api.employee.model.Employee;
 import com.salonhub.api.employee.model.Role;
 import com.salonhub.api.employee.repository.EmployeeRepository;
@@ -48,7 +48,7 @@ public class WaitTimeEstimator {
     private final EmployeeRepository employeeRepository;
     private final AppointmentRepository appointmentRepository;
     private final ServiceTypeRepository serviceTypeRepository;
-    private final BusinessHoursProperties businessHours;
+    private final BusinessSettingsService businessSettings;
 
     /** Used when a queue entry doesn't carry a serviceTypeId. */
     public static final int DEFAULT_SERVICE_MINUTES = 30;
@@ -187,7 +187,7 @@ public class WaitTimeEstimator {
      * free_at forward by serviceMinutes + turnoverBuffer.
      */
     private void assignOne(Map<Long, LocalDateTime> techFreeAt, int serviceMinutes, Long preferredTechId) {
-        int buffer = businessHours.turnoverOrDefault();
+        int buffer = businessSettings.getTurnoverMinutes();
         if (preferredTechId != null && techFreeAt.containsKey(preferredTechId)) {
             techFreeAt.put(preferredTechId,
                     techFreeAt.get(preferredTechId).plusMinutes(serviceMinutes + buffer));
@@ -204,38 +204,31 @@ public class WaitTimeEstimator {
     /**
      * If `pickupAt` falls outside salon hours OR the service wouldn't fit
      * before closing, roll forward to the next open day's opening time.
+     * Hours are looked up per weekday from BusinessSettingsService — Sunday
+     * can have different hours from Monday, individual days can be marked
+     * closed, all editable from the admin console.
      */
     private LocalDateTime clampToBusinessHours(LocalDateTime pickupAt, int serviceMinutes) {
-        LocalTime open = businessHours.openOrDefault();
-        LocalTime close = businessHours.closeOrDefault();
-
-        // Need to finish service before close.
-        LocalDateTime mustFinishBy = LocalDateTime.of(pickupAt.toLocalDate(), close);
-        LocalDateTime serviceEnd = pickupAt.plusMinutes(serviceMinutes);
-
-        // Roll forward day by day until we land on an open day whose schedule
-        // can fit the service.
         for (int hops = 0; hops < 14; hops++) {
             LocalDate day = pickupAt.toLocalDate();
-            boolean closedToday = businessHours.closedDaysOrDefault().contains(day.getDayOfWeek());
+            var hours = businessSettings.getHoursFor(day.getDayOfWeek());
 
-            if (!closedToday) {
-                LocalDateTime openAt = LocalDateTime.of(day, open);
+            if (hours != null) {
+                LocalDateTime openAt = LocalDateTime.of(day, hours.open());
+                LocalDateTime closeAt = LocalDateTime.of(day, hours.close());
                 if (pickupAt.isBefore(openAt)) {
-                    // Salon not open yet — wait until opening.
                     pickupAt = openAt;
-                    serviceEnd = pickupAt.plusMinutes(serviceMinutes);
-                    mustFinishBy = LocalDateTime.of(day, close);
                 }
-                if (!serviceEnd.isAfter(mustFinishBy)) {
+                LocalDateTime serviceEnd = pickupAt.plusMinutes(serviceMinutes);
+                if (!serviceEnd.isAfter(closeAt) && !pickupAt.isAfter(closeAt)) {
                     return pickupAt;
                 }
             }
-            // Either closed today or wouldn't fit — roll to tomorrow's open.
+            // Closed today OR wouldn't fit — roll to tomorrow's open.
+            // We re-loop so we look up the NEXT day's settings (which might
+            // also be closed, so we keep rolling).
             LocalDate next = day.plusDays(1);
-            pickupAt = LocalDateTime.of(next, open);
-            serviceEnd = pickupAt.plusMinutes(serviceMinutes);
-            mustFinishBy = LocalDateTime.of(next, close);
+            pickupAt = LocalDateTime.of(next, java.time.LocalTime.of(0, 0));
         }
         return pickupAt;
     }

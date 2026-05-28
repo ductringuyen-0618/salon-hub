@@ -406,6 +406,20 @@ class ApiService {
     return this.publicRequest<Employee[]>('/employees');
   }
 
+  /** Public — business settings (name, hours, contact, theme) so the
+   *  storefront can render correctly on first paint. */
+  async getSettings(): Promise<any> {
+    return this.publicRequest<any>('/settings');
+  }
+
+  /** ADMIN — updates the singleton business settings row. */
+  async updateSettings(payload: any): Promise<any> {
+    return this.request<any>('/settings', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
   /**
    * Fetch the busy windows for an employee on a specific day. Public — the
    * booking wizard uses this to disable time slots that already conflict

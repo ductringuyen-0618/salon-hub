@@ -12,7 +12,8 @@ import {
   Clock,
   Palette,
   UserCheck,
-  CreditCard
+  CreditCard,
+  Sparkles
 } from 'lucide-react';
 
 const AdminPage: React.FC = () => {
@@ -74,6 +75,13 @@ const AdminPage: React.FC = () => {
       icon: UserCheck,
       href: '/admin/checkins',
       color: 'bg-indigo-500'
+    },
+    {
+      title: 'Service Catalog',
+      description: 'Add, edit, and price services',
+      icon: Sparkles,
+      href: '/admin/services',
+      color: 'bg-teal-500'
     }
   ];
 
