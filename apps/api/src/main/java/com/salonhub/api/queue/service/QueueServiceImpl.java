@@ -26,6 +26,7 @@ public class QueueServiceImpl implements QueueService {
     private final CustomerRepository customerRepository;
     private final EmployeeRepository employeeRepository;
     private final QueueNotificationService notificationService;
+    private final WaitTimeEstimator waitTimeEstimator;
     
     @Override
     @Transactional
@@ -130,53 +131,45 @@ public class QueueServiceImpl implements QueueService {
     
     @Override
     public Integer calculateEstimatedWaitTime() {
-        List<Queue> waitingCustomers = queueRepository.findByStatusOrderByCreatedAtAsc(QueueStatus.WAITING);
-        
-        if (waitingCustomers.isEmpty()) {
-            return 15; // Base wait time
-        }
-        
-        // Average 30 minutes per customer + current queue
-        int baseTimePerCustomer = 30;
-        return baseTimePerCustomer * waitingCustomers.size();
+        // Smart estimate: simulates the queue draining against the actual
+        // number of available technicians AND their upcoming appointments,
+        // instead of the old position×30 minutes formula that pretended
+        // there was only one tech in the salon. See WaitTimeEstimator.
+        return waitTimeEstimator.estimateForNewArrival();
     }
-    
+
     @Override
     @Transactional
     public void updateQueuePositions() {
-        List<Queue> waitingCustomers = queueRepository.findByStatusOrderByCreatedAtAsc(QueueStatus.WAITING);
-        
-        for (int i = 0; i < waitingCustomers.size(); i++) {
-            Queue customer = waitingCustomers.get(i);
-            customer.setPosition(i + 1);
-            
-            // Update estimated wait time based on position
-            customer.setEstimatedWaitTime((i + 1) * 30); // 30 minutes per person ahead
-            
-            queueRepository.save(customer);
+        // Recompute position + estimatedWaitTime for every WAITING entry
+        // using the parallel-tech scheduler simulation. The estimator
+        // mutates the entities in place; persist them in a single batch.
+        List<Queue> waiting = waitTimeEstimator.recalculateWaitingQueue();
+        for (Queue q : waiting) {
+            queueRepository.save(q);
         }
     }
     
     @Override
     public QueueStatistics getQueueStatistics() {
         List<Queue> waitingCustomers = queueRepository.findByStatusOrderByCreatedAtAsc(QueueStatus.WAITING);
-        
-        if (waitingCustomers.isEmpty()) {
-            return new QueueStatistics(0, 0, 0);
-        }
-        
         int totalWaiting = waitingCustomers.size();
-        int averageWaitTime = waitingCustomers.stream()
-                .mapToInt(Queue::getEstimatedWaitTime)
-                .sum() / totalWaiting;
-        
-        // Calculate longest wait (time since created)
+
+        // The check-in page labels averageWaitTime as "Current Wait" —
+        // i.e. "if I walk in right now, how long until I'm seen?". So we
+        // expose the new-arrival estimate from the simulator (which is
+        // aware of parallel techs and their appointment books) instead of
+        // averaging stale per-entry numbers.
+        int currentWaitForNewArrival = waitTimeEstimator.estimateForNewArrival();
+
+        // Longest wait = real elapsed time of the longest-waiting customer
+        // (so the front-desk can see who's been there the longest).
         int longestWait = waitingCustomers.stream()
                 .mapToInt(q -> (int) Duration.between(q.getCreatedAt(), LocalDateTime.now()).toMinutes())
                 .max()
                 .orElse(0);
-        
-        return new QueueStatistics(totalWaiting, averageWaitTime, longestWait);
+
+        return new QueueStatistics(totalWaiting, currentWaitForNewArrival, longestWait);
     }
     
     private int getCurrentQueueSize() {

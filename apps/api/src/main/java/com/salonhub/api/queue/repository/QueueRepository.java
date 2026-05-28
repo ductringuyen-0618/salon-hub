@@ -16,6 +16,10 @@ public interface QueueRepository extends JpaRepository<Queue, Long> {
     
     // Find all entries by status ordered by created time
     List<Queue> findByStatusOrderByCreatedAtAsc(QueueStatus status);
+
+    // Find all entries by status (no ordering) — used by the wait-time
+    // simulator to enumerate IN_PROGRESS work blocking techs.
+    List<Queue> findByStatus(QueueStatus status);
     
     // Find queue entries for today by created time
     @Query("SELECT q FROM Queue q WHERE DATE(q.createdAt) = DATE(:date) ORDER BY q.createdAt ASC")
