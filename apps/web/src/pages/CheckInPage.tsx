@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { apiService } from "@/services/api";
-import AuthDebugger from "@/components/AuthDebugger";
 import { 
   UserCheck, 
   Users, 
@@ -134,9 +133,6 @@ const CheckInPage = () => {
 
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          {/* Debug Panel - Remove in production */}
-          <AuthDebugger />
-          
           {/* Welcome Section */}
           <div className="text-center mb-12">
             <div className="max-w-2xl mx-auto">
