@@ -27,8 +27,30 @@ import {
   Loader2
 } from 'lucide-react';
 import { services as mockServices, employees as mockEmployees, generateTimeSlots } from '@/lib/bookingData';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 import { cn } from '@/lib/utils';
+
+/**
+ * Parse a slot row (date "yyyy-MM-dd" + time "HH:mm") into a Date in LOCAL
+ * time. We can't use `new Date("2026-06-02T10:00:00")` directly because some
+ * browsers interpret the trailing space differently, and `new Date("2026-06-02")`
+ * gives UTC midnight (which displays as the previous day in non-UTC zones).
+ * Returns null on parse failure so callers can fall back gracefully.
+ */
+function parseSlotTime(dateStr: string, timeStr: string): Date | null {
+  const m = /^(\d{1,2}):(\d{2})/.exec(timeStr);
+  if (!m) return null;
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!dm) return null;
+  return new Date(
+    Number(dm[1]),
+    Number(dm[2]) - 1,
+    Number(dm[3]),
+    Number(m[1]),
+    Number(m[2]),
+    0
+  );
+}
 
 type BookingStep = 'services' | 'datetime' | 'details' | 'confirmation';
 
@@ -109,12 +131,68 @@ const BookingPage = () => {
     }
   }, [isAuthenticated, user]);
 
+  // Recompute time slots whenever date OR selected staff changes. When a
+  // specific staff is selected, we fetch their existing appointments for
+  // that day from /api/employees/{id}/availability and mark conflicting
+  // slots as unavailable so the user never picks a doomed time.
   useEffect(() => {
-    if (selectedDate) {
-      const slots = generateTimeSlots(format(selectedDate, 'yyyy-MM-dd'));
-      setAvailableSlots(slots);
-    }
-  }, [selectedDate]);
+    let cancelled = false;
+    (async () => {
+      if (!selectedDate) {
+        setAvailableSlots([]);
+        return;
+      }
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const baseSlots = generateTimeSlots(dateStr);
+
+      // "No preference" / empty = show all slots as available; user could
+      // be matched to any free staff. (Hard filter happens at backend
+      // on submit if multi-staff booking ever lands.)
+      if (!selectedEmployee) {
+        if (!cancelled) setAvailableSlots(baseSlots);
+        return;
+      }
+
+      try {
+        const empId = Number(selectedEmployee);
+        if (!Number.isFinite(empId) || empId <= 0) {
+          if (!cancelled) setAvailableSlots(baseSlots);
+          return;
+        }
+        const avail = await apiService.getEmployeeAvailability(empId, dateStr);
+        if (cancelled) return;
+
+        // Mark a slot unavailable if its start time falls inside any busy
+        // window. Slot times look like "10:00" / "2:30 PM" — depends on
+        // generateTimeSlots format. We assume HH:mm (24h) or "h:mm AM/PM".
+        const merged = baseSlots.map((slot: any) => {
+          const slotStart = parseSlotTime(dateStr, slot.time);
+          if (!slotStart) return slot;
+          const conflict = avail.busy.some(b => {
+            const s = new Date(b.startTime).getTime();
+            const e = new Date(b.endTime).getTime();
+            return slotStart.getTime() >= s && slotStart.getTime() < e;
+          });
+          return conflict ? { ...slot, available: false, booked: true } : slot;
+        });
+        setAvailableSlots(merged);
+
+        // If the user had already picked a time and it just became
+        // unavailable for the newly chosen staff, drop the selection
+        // so they don't proceed with a doomed booking.
+        if (selectedTime) {
+          const stillOk = merged.some((s: any) => s.time === selectedTime && !s.booked);
+          if (!stillOk) setSelectedTime('');
+        }
+      } catch (err) {
+        // Availability fetch failed — fall back to showing all slots and
+        // let the backend 409 if a real conflict exists at submit time.
+        console.warn('[booking] availability fetch failed, showing all slots', err);
+        if (!cancelled) setAvailableSlots(baseSlots);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedDate, selectedEmployee]);
 
   const handleServiceToggle = (serviceId: string) => {
     setSelectedServices(prev => 
@@ -272,8 +350,11 @@ const BookingPage = () => {
                   <div className="flex justify-between">
                     <span className="text-dynamic-text-secondary">Date & Time:</span>
                     <span className="text-dynamic-text font-medium">
-                      {bookingData ? 
-                        format(new Date(bookingData.appointmentDate), 'EEEE, MMMM d') + ' at ' + bookingData.appointmentTime :
+                      {bookingData ?
+                        // parse(...) treats the "yyyy-MM-dd" string as local
+                        // time. `new Date(s)` would treat it as UTC midnight,
+                        // shifting the displayed day backwards in non-UTC zones.
+                        format(parse(bookingData.appointmentDate, 'yyyy-MM-dd', new Date()), 'EEEE, MMMM d') + ' at ' + bookingData.appointmentTime :
                         selectedDate ? format(selectedDate, 'EEEE, MMMM d') + ' at ' + selectedTime : 'Date & Time'
                       }
                     </span>
@@ -484,42 +565,102 @@ const BookingPage = () => {
                       </div>
                     </div>
 
-                    {/* Time Slots */}
+                    {/* Employee Selection moved here so customers pick a
+                        technician BEFORE seeing the time grid — that lets us
+                        show their real availability instead of bumping the
+                        user out at the confirm step. */}
                     <div>
                       <h3 className="text-xl font-medium text-dynamic-text mb-4">
-                        {selectedDate ? `Available Times for ${format(selectedDate, 'EEEE, MMM d')}` : 'Select a date first'}
+                        {selectedDate ? 'Choose Your Technician' : 'Select a date first'}
                       </h3>
-                      
                       {selectedDate ? (
-                        <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto">
-                          {availableSlots.filter(slot => slot.available).map((slot) => (
-                            <Button
-                              key={slot.time}
-                              variant={selectedTime === slot.time ? "default" : "outline"}
-                              onClick={() => setSelectedTime(slot.time)}
+                        <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
+                          <div
+                            className={cn(
+                              "border rounded-xl p-3 cursor-pointer transition-all duration-200 text-center",
+                              selectedEmployee === '' ? "border-dynamic-primary bg-dynamic-primary/5" : "border-dynamic-border hover:border-dynamic-primary/50"
+                            )}
+                            onClick={() => setSelectedEmployee('')}
+                          >
+                            <Users className="h-6 w-6 mx-auto mb-1 text-dynamic-primary" />
+                            <p className="font-medium text-dynamic-text text-sm">No Preference</p>
+                            <p className="text-xs text-dynamic-text-secondary">Any available</p>
+                          </div>
+                          {employees.filter((emp: any) => emp.available).map((employee: any) => (
+                            <div
+                              key={employee.id}
                               className={cn(
-                                "h-12 text-sm font-medium transition-all duration-200",
-                                selectedTime === slot.time 
-                                  ? "text-white shadow-md" 
-                                  : "border-dynamic-border hover:border-dynamic-primary hover:bg-dynamic-primary/10"
+                                "border rounded-xl p-3 cursor-pointer transition-all duration-200 text-center",
+                                selectedEmployee === employee.id ? "border-dynamic-primary bg-dynamic-primary/5" : "border-dynamic-border hover:border-dynamic-primary/50"
                               )}
-                              style={selectedTime === slot.time ? {backgroundColor: '#d34000'} : {}}
+                              onClick={() => setSelectedEmployee(employee.id)}
                             >
-                              {slot.time}
-                            </Button>
+                              <User className="h-6 w-6 mx-auto mb-1 text-dynamic-primary" />
+                              <p className="font-medium text-dynamic-text text-sm">{employee.name}</p>
+                              <p className="text-xs text-dynamic-text-secondary">
+                                {(employee.specialties && employee.specialties.length > 0)
+                                  ? employee.specialties.join(', ')
+                                  : (employee.role ? employee.role.replace('_', ' ').toLowerCase() : 'Available')}
+                              </p>
+                            </div>
                           ))}
                         </div>
                       ) : (
                         <div className="text-center py-12 text-dynamic-text-secondary">
-                          <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p>Please select a date to see available times</p>
+                          <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>Pick a date to see who's available</p>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Employee Selection */}
-                  {selectedDate && selectedTime && (
+                  {/* Time Slots — full width, shows real availability for
+                      the chosen technician. Booked slots stay visible but
+                      are crossed out + disabled so users see WHY a time
+                      they wanted isn't available. */}
+                  {selectedDate && (
+                    <div className="mt-8">
+                      <h3 className="text-xl font-medium text-dynamic-text mb-4">
+                        Available Times for {format(selectedDate, 'EEEE, MMM d')}
+                        {selectedEmployee && employees.find((e: any) => e.id === selectedEmployee) && (
+                          <span className="ml-2 text-sm text-dynamic-text-secondary font-normal">
+                            with {employees.find((e: any) => e.id === selectedEmployee)?.name}
+                          </span>
+                        )}
+                      </h3>
+                      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-72 overflow-y-auto">
+                        {availableSlots.map((slot: any) => {
+                          const isBooked = slot.booked === true || slot.available === false;
+                          const isSelected = selectedTime === slot.time && !isBooked;
+                          return (
+                            <Button
+                              key={slot.time}
+                              variant={isSelected ? "default" : "outline"}
+                              disabled={isBooked}
+                              onClick={() => !isBooked && setSelectedTime(slot.time)}
+                              className={cn(
+                                "h-10 text-sm font-medium transition-all duration-200",
+                                isBooked && "line-through opacity-40 cursor-not-allowed",
+                                isSelected ? "text-white shadow-md" : "border-dynamic-border hover:border-dynamic-primary hover:bg-dynamic-primary/10"
+                              )}
+                              style={isSelected ? { backgroundColor: '#d34000' } : {}}
+                              title={isBooked ? 'Already booked' : 'Available'}
+                            >
+                              {slot.time}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                      {selectedEmployee && availableSlots.some((s: any) => s.booked) && (
+                        <p className="mt-3 text-xs text-dynamic-text-secondary">
+                          <span className="line-through">crossed-out</span> slots are already booked with the selected technician.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Old Employee Selection (replaced above) */}
+                  {false && selectedDate && selectedTime && (
                     <div className="mt-8">
                       <h3 className="text-xl font-medium text-dynamic-text mb-4">Choose Your Technician (Optional)</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

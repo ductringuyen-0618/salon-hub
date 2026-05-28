@@ -1,10 +1,18 @@
 package com.salonhub.api.employee.controller;
 
+import com.salonhub.api.appointment.model.Appointment;
+import com.salonhub.api.appointment.model.ServiceType;
+import com.salonhub.api.appointment.repository.AppointmentRepository;
+import com.salonhub.api.employee.dto.EmployeeAvailabilityResponseDTO;
 import com.salonhub.api.employee.dto.EmployeeRequestDTO;
 import com.salonhub.api.employee.dto.EmployeeResponseDTO;
 import com.salonhub.api.employee.mapper.EmployeeMapper;
 import com.salonhub.api.employee.model.Employee;
 import com.salonhub.api.employee.service.EmployeeService;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 
 import org.springframework.web.bind.annotation.RequestBody;
 import jakarta.validation.Valid;
@@ -42,10 +50,12 @@ import java.util.List;
 public class EmployeeController {
     private final EmployeeService service;
     private final EmployeeMapper mapper;
+    private final AppointmentRepository appointmentRepo;
 
-    public EmployeeController(EmployeeService service, EmployeeMapper mapper) {
+    public EmployeeController(EmployeeService service, EmployeeMapper mapper, AppointmentRepository appointmentRepo) {
         this.service = service;
         this.mapper = mapper;
+        this.appointmentRepo = appointmentRepo;
     }
 
     /**
@@ -58,6 +68,59 @@ public class EmployeeController {
                       .stream()
                       .map(mapper::toResponse)
                       .toList();
+    }
+
+    /**
+     * Availability for an employee on a specific day.
+     *
+     * PUBLIC endpoint — the booking page calls this BEFORE the customer
+     * picks a time slot, so unavailable slots can be visually disabled and
+     * users never hit a 409 at the confirm step.
+     *
+     * The response lists busy windows (existing appointments' start + total
+     * service duration). The frontend overlays these against its time-slot
+     * grid; any slot whose start time falls inside a busy window is greyed.
+     */
+    @GetMapping("/{id}/availability")
+    public ResponseEntity<EmployeeAvailabilityResponseDTO> availability(
+            @PathVariable @Positive Long id,
+            @RequestParam("date") String dateStr) {
+
+        if (service.findById(id).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        LocalDate day;
+        try {
+            day = LocalDate.parse(dateStr);
+        } catch (DateTimeParseException e) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        LocalDateTime startOfDay = day.atStartOfDay();
+        LocalDateTime endOfDay = day.plusDays(1).atStartOfDay();
+
+        List<Appointment> appts =
+            appointmentRepo.findByEmployeeIdAndStartTimeBetween(id, startOfDay, endOfDay);
+
+        List<EmployeeAvailabilityResponseDTO.BusyWindow> windows = appts.stream()
+            .map(a -> {
+                int totalMinutes = a.getServices() == null ? 60 :
+                    a.getServices().stream()
+                        .mapToInt(ServiceType::getEstimatedDurationMinutes)
+                        .sum();
+                if (totalMinutes <= 0) totalMinutes = 60;
+                return new EmployeeAvailabilityResponseDTO.BusyWindow(
+                    a.getStartTime(),
+                    a.getStartTime().plusMinutes(totalMinutes),
+                    a.getId()
+                );
+            })
+            .toList();
+
+        return ResponseEntity.ok(new EmployeeAvailabilityResponseDTO(
+            id, day.toString(), windows
+        ));
     }
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")

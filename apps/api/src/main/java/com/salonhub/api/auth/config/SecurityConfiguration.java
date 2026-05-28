@@ -86,6 +86,10 @@ public class SecurityConfiguration {
                                 .requestMatchers(HttpMethod.DELETE, "/api/customers/**").hasRole("ADMIN")
                                 // Employee management - List is public for technician selection, specific endpoints need auth
                                 .requestMatchers(HttpMethod.GET, "/api/employees").permitAll()
+                                // Availability is public — the booking wizard
+                                // shows it to anonymous customers so they can
+                                // see which slots are taken before committing.
+                                .requestMatchers(HttpMethod.GET, "/api/employees/*/availability").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/employees/**").hasAnyRole("TECHNICIAN", "FRONT_DESK", "MANAGER", "ADMIN")
                                 .requestMatchers(HttpMethod.POST, "/api/employees").hasRole("ADMIN")
                                 .requestMatchers(HttpMethod.PUT, "/api/employees/**").hasRole("ADMIN")

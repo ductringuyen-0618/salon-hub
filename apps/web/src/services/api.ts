@@ -48,6 +48,16 @@ export interface Employee {
   specialties?: string[];
 }
 
+export interface EmployeeAvailability {
+  employeeId: number;
+  date: string; // yyyy-MM-dd
+  busy: Array<{
+    startTime: string;     // ISO LocalDateTime, e.g. "2026-06-02T10:00:00"
+    endTime: string;       // ISO LocalDateTime
+    appointmentId: number;
+  }>;
+}
+
 export interface Service {
   id: number;
   name: string;
@@ -389,6 +399,17 @@ class ApiService {
   // Employee endpoints (public - used for technician selection)
   async getEmployees(): Promise<Employee[]> {
     return this.publicRequest<Employee[]>('/employees');
+  }
+
+  /**
+   * Fetch the busy windows for an employee on a specific day. Public — the
+   * booking wizard uses this to disable time slots that already conflict
+   * with an existing appointment for the chosen technician.
+   */
+  async getEmployeeAvailability(employeeId: number, date: string): Promise<EmployeeAvailability> {
+    return this.publicRequest<EmployeeAvailability>(
+      `/employees/${employeeId}/availability?date=${encodeURIComponent(date)}`
+    );
   }
 
   async getEmployeeById(id: number): Promise<Employee> {
