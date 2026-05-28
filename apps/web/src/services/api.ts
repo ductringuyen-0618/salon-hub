@@ -134,7 +134,12 @@ export interface CheckInRequestDTO {
   name: string;
   phoneNumber?: string;
   email?: string;
+  /** @deprecated use preferredTechnicianId */
   preferredTechnician?: string;
+  /** Numeric Employee.id of the customer's preferred technician (server uses this). */
+  preferredTechnicianId?: number | null;
+  /** Numeric ServiceType.id of the requested service (server uses real duration). */
+  serviceTypeId?: number | null;
   partySize?: number;
   additionalPeople?: { name: string }[];
   notes?: string;
@@ -594,6 +599,15 @@ class ApiService {
     if (note) requestBody.note = note;
     const service = blankToUndef(checkInData.requestedService);
     if (service) requestBody.requestedService = service;
+    // Forward numeric IDs for the scheduler. These are NEW since the
+    // service-aware wait-time follow-up; backend uses them to pick the
+    // real per-service duration and route the customer to a specific tech.
+    if (checkInData.serviceTypeId != null && Number.isFinite(checkInData.serviceTypeId)) {
+      requestBody.serviceTypeId = checkInData.serviceTypeId;
+    }
+    if (checkInData.preferredTechnicianId != null && Number.isFinite(checkInData.preferredTechnicianId)) {
+      requestBody.preferredTechnicianId = checkInData.preferredTechnicianId;
+    }
     
     return this.publicRequest<CheckInResponseDTO>('/checkin', {
       method: 'POST',

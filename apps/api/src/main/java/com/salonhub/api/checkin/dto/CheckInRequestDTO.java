@@ -24,9 +24,18 @@ public class CheckInRequestDTO {
 
     // Flag to indicate if this is a guest check-in (true) or existing customer lookup (false)
     private boolean isGuest = false;
-    
+
     // Additional fields that frontend might send
     private String requestedService;
+
+    /** Optional ID of the chosen service. When set, the wait-time scheduler
+     *  uses the service's real duration instead of the 30-min default. */
+    private Long serviceTypeId;
+
+    /** Optional ID of the customer's preferred technician. When set, the
+     *  scheduler will assign this customer only to that tech (longer wait
+     *  if the tech is busy, but accurate). */
+    private Long preferredTechnicianId;
     
     // Helper method to get contact as phone or email
     public String getPhoneOrEmail() {

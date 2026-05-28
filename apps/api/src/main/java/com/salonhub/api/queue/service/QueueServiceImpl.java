@@ -40,7 +40,14 @@ public class QueueServiceImpl implements QueueService {
         queueEntry.setPosition(position);
         
         if (queueEntry.getEstimatedWaitTime() == null) {
-            queueEntry.setEstimatedWaitTime(calculateEstimatedWaitTime());
+            // Use the customer's chosen service + preferred tech (if any)
+            // so the estimate they see at check-in matches the simulation.
+            queueEntry.setEstimatedWaitTime(
+                waitTimeEstimator.estimateForNewArrival(
+                    queueEntry.getServiceTypeId(),
+                    queueEntry.getEmployeeId()
+                )
+            );
         }
         
         Queue saved = queueRepository.save(queueEntry);

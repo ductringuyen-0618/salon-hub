@@ -3,6 +3,8 @@ package com.salonhub.api.queue.service;
 import com.salonhub.api.appointment.model.Appointment;
 import com.salonhub.api.appointment.model.ServiceType;
 import com.salonhub.api.appointment.repository.AppointmentRepository;
+import com.salonhub.api.appointment.repository.ServiceTypeRepository;
+import com.salonhub.api.config.BusinessHoursProperties;
 import com.salonhub.api.employee.model.Employee;
 import com.salonhub.api.employee.model.Role;
 import com.salonhub.api.employee.repository.EmployeeRepository;
@@ -14,8 +16,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
+import java.time.LocalTime;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -23,18 +26,18 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Estimates how long a walk-in will wait, accounting for:
- *   - the number of technicians on shift (parallel capacity)
- *   - IN_PROGRESS queue entries (techs busy until current service ends)
- *   - upcoming scheduled appointments (techs blocked at specific times)
- *   - the existing WAITING queue (drained in order against the available techs)
- *
- * The simulation works in minutes. For each tech we keep a "free_at"
- * timestamp. We seed it from now, push it forward for any IN_PROGRESS or
- * imminent appointment, then walk the WAITING queue in arrival order,
- * assigning each customer to the tech with the earliest free_at. A new
- * walk-in joining the back of the queue gets the FINAL min(free_at) — i.e.
- * how long until the first tech finishes everything ahead of them.
+ * Estimates when a walk-in will be seen, accounting for:
+ *   1. Real per-service durations from queue.service_type_id (falls back to
+ *      a default for unspecified services).
+ *   2. The number of technicians on shift (parallel capacity).
+ *   3. IN_PROGRESS queue entries (those techs are busy mid-service).
+ *   4. Upcoming scheduled appointments (techs blocked at specific times).
+ *   5. Customer preferred-technician routing — a customer who requested
+ *      Lisa waits for Lisa even if Maria becomes free sooner.
+ *   6. A configurable turnover buffer between back-to-back walk-ins so a
+ *      tech has time to clean their station.
+ *   7. Salon business hours — wait time that would extend past closing
+ *      rolls over to the next open day's opening time.
  */
 @Component
 @RequiredArgsConstructor
@@ -44,48 +47,55 @@ public class WaitTimeEstimator {
     private final QueueRepository queueRepository;
     private final EmployeeRepository employeeRepository;
     private final AppointmentRepository appointmentRepository;
+    private final ServiceTypeRepository serviceTypeRepository;
+    private final BusinessHoursProperties businessHours;
 
-    /** Default per-customer service time when the queue entry has no
-     *  specific service attached (walk-ins don't carry service IDs today). */
+    /** Used when a queue entry doesn't carry a serviceTypeId. */
     public static final int DEFAULT_SERVICE_MINUTES = 30;
 
-    /** Generous fallback when no techs are on shift (closed / no staff). */
+    /** Returned when no employees are on shift today. */
     public static final int NO_STAFF_FALLBACK_MINUTES = 60;
 
-    /** Look this far forward when scanning a tech's appointment book. */
+    /** How far ahead we scan a technician's appointment book. */
     public static final int APPOINTMENT_WINDOW_HOURS = 12;
 
-    /**
-     * Estimate the wait, in minutes, for a brand-new walk-in joining the
-     * back of the queue right now. Always >= 0.
-     */
+    /** Public entry: how long would a brand-new walk-in wait? */
     public int estimateForNewArrival() {
-        return estimateForNewArrival(LocalDateTime.now());
+        return estimateForNewArrival(LocalDateTime.now(), null, null);
     }
 
-    int estimateForNewArrival(LocalDateTime now) {
+    /**
+     * Public entry with the customer's chosen service + preferred tech, so
+     * the estimate they see at submission matches what they'll actually wait.
+     */
+    public int estimateForNewArrival(Long serviceTypeId, Long preferredTechId) {
+        return estimateForNewArrival(LocalDateTime.now(), serviceTypeId, preferredTechId);
+    }
+
+    int estimateForNewArrival(LocalDateTime now, Long newServiceId, Long newPreferredTechId) {
         Map<Long, LocalDateTime> techFreeAt = buildTechFreeAtMap(now);
         if (techFreeAt.isEmpty()) {
             return NO_STAFF_FALLBACK_MINUTES;
         }
 
-        // Drain the existing WAITING queue first.
-        List<Queue> waiting = queueRepository.findByStatusOrderByCreatedAtAsc(QueueStatus.WAITING);
-        for (Queue q : waiting) {
-            assignNext(techFreeAt, durationFor(q));
+        // Drain existing WAITING queue first using each entry's real
+        // service duration + preferred tech preference.
+        for (Queue q : queueRepository.findByStatusOrderByCreatedAtAsc(QueueStatus.WAITING)) {
+            assignOne(techFreeAt, durationFor(q), q.getEmployeeId());
         }
 
-        // The new arrival picks up the next-free tech.
-        LocalDateTime earliestFree = Collections.min(techFreeAt.values());
-        long minutes = Math.max(0, Duration.between(now, earliestFree).toMinutes());
+        int newCustomerDuration = durationForServiceId(newServiceId);
+        LocalDateTime pickupAt = pickupTimeFor(techFreeAt, newPreferredTechId);
+        if (pickupAt == null) return NO_STAFF_FALLBACK_MINUTES;
+
+        // Clamp to salon business hours.
+        pickupAt = clampToBusinessHours(pickupAt, newCustomerDuration);
+
+        long minutes = Math.max(0, Duration.between(now, pickupAt).toMinutes());
         return (int) minutes;
     }
 
-    /**
-     * Recompute estimatedWaitTime for every WAITING queue entry in order,
-     * using the same scheduler simulation. Returns the list in queue order.
-     * The caller should persist updated values.
-     */
+    /** Recompute position + estimatedWaitTime for every WAITING entry. */
     public List<Queue> recalculateWaitingQueue() {
         return recalculateWaitingQueue(LocalDateTime.now());
     }
@@ -106,67 +116,52 @@ public class WaitTimeEstimator {
 
         int position = 1;
         for (Queue q : waiting) {
-            LocalDateTime pickupAt = peekEarliest(techFreeAt);
+            int duration = durationFor(q);
+            LocalDateTime pickupAt = pickupTimeFor(techFreeAt, q.getEmployeeId());
+            if (pickupAt == null) {
+                // Preferred tech doesn't exist anymore — fall back to any.
+                pickupAt = Collections.min(techFreeAt.values());
+                q.setEmployeeId(null);
+            }
+            pickupAt = clampToBusinessHours(pickupAt, duration);
             long mins = Math.max(0, Duration.between(now, pickupAt).toMinutes());
             q.setEstimatedWaitTime((int) mins);
             q.setPosition(position++);
-            assignNext(techFreeAt, durationFor(q));
+            assignOne(techFreeAt, duration, q.getEmployeeId());
         }
         return waiting;
     }
 
-    /* ---------------- internal scheduling helpers ---------------- */
+    /* ----------------- scheduling internals ----------------- */
 
-    /**
-     * Build a map of tech-id → next-free moment, starting from `now` and
-     * pushed forward by any IN_PROGRESS work or upcoming appointments
-     * they're committed to.
-     */
     private Map<Long, LocalDateTime> buildTechFreeAtMap(LocalDateTime now) {
-        // Service-providing employees only. Front-desk does not take walk-in
-        // customers; everyone else (TECHNICIAN/MANAGER/ADMIN who's marked
-        // available) is fair game.
         List<Employee> techs = employeeRepository.findAll().stream()
                 .filter(Employee::isAvailable)
                 .filter(e -> e.getRole() != Role.FRONT_DESK)
                 .toList();
 
         Map<Long, LocalDateTime> map = new HashMap<>();
-        for (Employee t : techs) {
-            map.put(t.getId(), now);
-        }
+        for (Employee t : techs) map.put(t.getId(), now);
         if (map.isEmpty()) return map;
 
-        // Push tech free-times forward for IN_PROGRESS queue work.
-        // Assumption: the entry started at updatedAt and will run for its
-        // estimatedWaitTime (or default).
-        List<Queue> inProgress = queueRepository.findByStatus(QueueStatus.IN_PROGRESS);
-        for (Queue q : inProgress) {
+        // IN_PROGRESS work blocks the tech.
+        for (Queue q : queueRepository.findByStatus(QueueStatus.IN_PROGRESS)) {
             Long empId = q.getEmployeeId();
             if (empId == null || !map.containsKey(empId)) continue;
             LocalDateTime startedAt = q.getUpdatedAt() != null ? q.getUpdatedAt() : now;
             LocalDateTime done = startedAt.plusMinutes(durationFor(q));
-            if (done.isAfter(map.get(empId))) {
-                map.put(empId, done);
-            }
+            if (done.isAfter(map.get(empId))) map.put(empId, done);
         }
 
-        // Push tech free-times forward for imminent appointments. For each
-        // tech we look at appointments inside [now, now + window] and merge
-        // them into the free-at: if an appointment starts before the tech's
-        // current free-at + slack, treat the tech as busy through the end
-        // of that appointment.
+        // Upcoming appointments block the tech.
         LocalDateTime windowEnd = now.plusHours(APPOINTMENT_WINDOW_HOURS);
         for (Long empId : map.keySet()) {
             List<Appointment> appts = appointmentRepository
                     .findByEmployeeIdAndStartTimeBetween(empId, now, windowEnd);
             for (Appointment a : appts) {
-                int duration = totalDurationOf(a);
-                LocalDateTime apptEnd = a.getStartTime().plusMinutes(duration);
+                int dur = totalDurationOf(a);
+                LocalDateTime apptEnd = a.getStartTime().plusMinutes(dur);
                 LocalDateTime currentFree = map.get(empId);
-                // If the appointment overlaps the current free-at OR starts
-                // before we could realistically squeeze a 30min walk-in in,
-                // push the free-at to the appointment's end.
                 if (a.getStartTime().isBefore(currentFree.plusMinutes(DEFAULT_SERVICE_MINUTES))
                         && apptEnd.isAfter(currentFree)) {
                     map.put(empId, apptEnd);
@@ -176,35 +171,90 @@ public class WaitTimeEstimator {
         return map;
     }
 
-    private LocalDateTime peekEarliest(Map<Long, LocalDateTime> techFreeAt) {
+    /**
+     * Where would this customer (with optional preferredTechId) be picked
+     * up next? Returns null if they want a tech who isn't on the roster.
+     */
+    private LocalDateTime pickupTimeFor(Map<Long, LocalDateTime> techFreeAt, Long preferredTechId) {
+        if (preferredTechId != null) {
+            return techFreeAt.get(preferredTechId); // null if not on shift
+        }
         return Collections.min(techFreeAt.values());
     }
 
-    private void assignNext(Map<Long, LocalDateTime> techFreeAt, int serviceMinutes) {
+    /**
+     * Assign this customer to the appropriate tech and push that tech's
+     * free_at forward by serviceMinutes + turnoverBuffer.
+     */
+    private void assignOne(Map<Long, LocalDateTime> techFreeAt, int serviceMinutes, Long preferredTechId) {
+        int buffer = businessHours.turnoverOrDefault();
+        if (preferredTechId != null && techFreeAt.containsKey(preferredTechId)) {
+            techFreeAt.put(preferredTechId,
+                    techFreeAt.get(preferredTechId).plusMinutes(serviceMinutes + buffer));
+            return;
+        }
         Map.Entry<Long, LocalDateTime> earliest = techFreeAt.entrySet().stream()
                 .min(Comparator.comparing(Map.Entry::getValue))
                 .orElse(null);
         if (earliest == null) return;
-        techFreeAt.put(earliest.getKey(), earliest.getValue().plusMinutes(serviceMinutes));
+        techFreeAt.put(earliest.getKey(),
+                earliest.getValue().plusMinutes(serviceMinutes + buffer));
+    }
+
+    /**
+     * If `pickupAt` falls outside salon hours OR the service wouldn't fit
+     * before closing, roll forward to the next open day's opening time.
+     */
+    private LocalDateTime clampToBusinessHours(LocalDateTime pickupAt, int serviceMinutes) {
+        LocalTime open = businessHours.openOrDefault();
+        LocalTime close = businessHours.closeOrDefault();
+
+        // Need to finish service before close.
+        LocalDateTime mustFinishBy = LocalDateTime.of(pickupAt.toLocalDate(), close);
+        LocalDateTime serviceEnd = pickupAt.plusMinutes(serviceMinutes);
+
+        // Roll forward day by day until we land on an open day whose schedule
+        // can fit the service.
+        for (int hops = 0; hops < 14; hops++) {
+            LocalDate day = pickupAt.toLocalDate();
+            boolean closedToday = businessHours.closedDaysOrDefault().contains(day.getDayOfWeek());
+
+            if (!closedToday) {
+                LocalDateTime openAt = LocalDateTime.of(day, open);
+                if (pickupAt.isBefore(openAt)) {
+                    // Salon not open yet — wait until opening.
+                    pickupAt = openAt;
+                    serviceEnd = pickupAt.plusMinutes(serviceMinutes);
+                    mustFinishBy = LocalDateTime.of(day, close);
+                }
+                if (!serviceEnd.isAfter(mustFinishBy)) {
+                    return pickupAt;
+                }
+            }
+            // Either closed today or wouldn't fit — roll to tomorrow's open.
+            LocalDate next = day.plusDays(1);
+            pickupAt = LocalDateTime.of(next, open);
+            serviceEnd = pickupAt.plusMinutes(serviceMinutes);
+            mustFinishBy = LocalDateTime.of(next, close);
+        }
+        return pickupAt;
     }
 
     private int durationFor(Queue q) {
-        // For now walk-in queue entries don't carry a service duration; use
-        // the existing estimated wait (which the FRONT_DESK can override) or
-        // fall back to the default.
-        if (q.getEstimatedWaitTime() != null && q.getEstimatedWaitTime() > 0
-                && q.getEstimatedWaitTime() < 240) {
-            // Treat anything <4h as a duration hint (not a propagated total wait).
-            // This is a heuristic during the transition; once we wire services
-            // into queue entries we can use the real number.
-            return DEFAULT_SERVICE_MINUTES;
-        }
-        return DEFAULT_SERVICE_MINUTES;
+        return durationForServiceId(q.getServiceTypeId());
+    }
+
+    private int durationForServiceId(Long serviceTypeId) {
+        if (serviceTypeId == null) return DEFAULT_SERVICE_MINUTES;
+        return serviceTypeRepository.findById(serviceTypeId)
+                .map(ServiceType::getEstimatedDurationMinutes)
+                .filter(m -> m != null && m > 0)
+                .orElse(DEFAULT_SERVICE_MINUTES);
     }
 
     private int totalDurationOf(Appointment a) {
         if (a.getServices() == null || a.getServices().isEmpty()) {
-            return DEFAULT_SERVICE_MINUTES * 2; // appointment default = 60min
+            return DEFAULT_SERVICE_MINUTES * 2;
         }
         int total = a.getServices().stream()
                 .mapToInt(ServiceType::getEstimatedDurationMinutes)

@@ -29,9 +29,12 @@ const formSchema = z.object({
   contact: z.string().min(5, {
     message: "Please enter a valid phone number or email.",
   }),
-  technician: z.string({
-    required_error: "Please select a technician preference.",
-  }),
+  // Empty string = "First Available" (no specific tech preference).
+  // Non-empty = string-stringified Employee.id.
+  technician: z.string(),
+  // Empty string = no specific service (scheduler uses 30-min default).
+  // Non-empty = string-stringified ServiceType.id.
+  service: z.string(),
 });
 
 const additionalPersonSchema = z.object({
@@ -63,8 +66,31 @@ const CheckInForm = () => {
       name: "",
       contact: "",
       technician: "",
+      service: "",
     },
   });
+
+  // Live employee + service catalog so the form sends real IDs.
+  const [employees, setEmployees] = useState<Array<{ id: number; name: string; role: string; available: boolean }>>([]);
+  const [services, setServices] = useState<Array<{ id: number; name: string; estimatedDurationMinutes?: number; duration?: number; price?: number | string; category?: string }>>([]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [emps, svcs] = await Promise.all([
+          apiService.getEmployees(),
+          apiService.getServices(),
+        ]);
+        if (cancelled) return;
+        setEmployees((emps || []).filter((e: any) => e.available && e.role !== 'FRONT_DESK'));
+        setServices(svcs || []);
+      } catch (err) {
+        console.warn('[check-in] failed to load employees/services; using defaults', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Auto-populate form when user is authenticated
   React.useEffect(() => {
@@ -106,11 +132,19 @@ const CheckInForm = () => {
     // person so each gets their own queue entry, with partial-failure
     // handling: if person 2 fails we still keep person 1's queue entry.
     const isEmail = values.contact.includes('@');
+    // "__any__" is the sentinel for "No preference / First Available". The
+    // real backend IDs are positive numbers; we translate the sentinel to
+    // null so the scheduler defaults kick in.
+    const techIdRaw = values.technician;
+    const serviceIdRaw = values.service;
+    const techIdNum = (techIdRaw && techIdRaw !== '__any__') ? Number(techIdRaw) : null;
+    const serviceIdNum = (serviceIdRaw && serviceIdRaw !== '__any__') ? Number(serviceIdRaw) : null;
     const primary = {
       name: values.name,
       phoneNumber: isEmail ? undefined : values.contact,
       email: isEmail ? values.contact : undefined,
-      preferredTechnician: values.technician,
+      preferredTechnicianId: Number.isFinite(techIdNum as number) && (techIdNum as number) > 0 ? techIdNum : null,
+      serviceTypeId: Number.isFinite(serviceIdNum as number) && (serviceIdNum as number) > 0 ? serviceIdNum : null,
       notes: '',
       requestedService: '',
       guest: true,
@@ -139,7 +173,8 @@ const CheckInForm = () => {
             name: person.name,
             phoneNumber: person.phoneNumber,
             email: person.email,
-            preferredTechnician: primary.preferredTechnician,
+            preferredTechnicianId: primary.preferredTechnicianId ?? undefined,
+            serviceTypeId: primary.serviceTypeId ?? undefined,
             notes: '',
             requestedService: '',
             guest: true,
@@ -321,6 +356,43 @@ const CheckInForm = () => {
 
               <FormField
                 control={form.control}
+                name="service"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Check className="h-4 w-4" />
+                      Service (optional)
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="What are you here for?" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {/* Radix forbids value="" on SelectItem. Sentinel
+                            "__any__" maps back to null at submit. */}
+                        <SelectItem value="__any__">No preference</SelectItem>
+                        {services.map(s => {
+                          const mins = s.estimatedDurationMinutes ?? s.duration ?? 30;
+                          return (
+                            <SelectItem key={s.id} value={String(s.id)}>
+                              {s.name} {mins ? `(${mins} min)` : ''}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Picking a service gives you a more accurate wait estimate. Leave as "No preference" if you're not sure.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="technician"
                 render={({ field }) => (
                   <FormItem>
@@ -328,23 +400,24 @@ const CheckInForm = () => {
                       <UserCheck className="h-4 w-4" />
                       Technician Preference
                     </FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Choose your technician preference" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="first-available">First Available</SelectItem>
-                        <SelectItem value="lisa">Lisa - Nail Specialist</SelectItem>
-                        <SelectItem value="maria">Maria - Pedicure Expert</SelectItem>
-                        <SelectItem value="jenny">Jenny - Nail Art Specialist</SelectItem>
-                        <SelectItem value="kim">Kim - Spa Services</SelectItem>
-                        <SelectItem value="sarah">Sarah - Manicure Specialist</SelectItem>
+                        {/* "__any__" sentinel — see service dropdown above. */}
+                        <SelectItem value="__any__">First Available</SelectItem>
+                        {employees.map(emp => (
+                          <SelectItem key={emp.id} value={String(emp.id)}>
+                            {emp.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Select "First Available" for faster service, or choose a specific technician.
+                      "First Available" gives you the soonest slot. Picking a specific technician may mean a longer wait but guarantees who'll serve you.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

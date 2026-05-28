@@ -39,12 +39,16 @@ public class CheckInService {
             customer = findExistingCustomer(request);
         }
         
-        // Add customer to queue
+        // Add customer to queue, stamping the preferred tech + chosen service
+        // so the wait-time scheduler can use accurate durations and route
+        // around customer preferences.
         Queue queueEntry = new Queue(
             customer.getId(),
             request.getNote() != null ? request.getNote() : "Walk-in customer"
         );
-        
+        queueEntry.setEmployeeId(request.getPreferredTechnicianId());
+        queueEntry.setServiceTypeId(request.getServiceTypeId());
+
         Queue savedQueueEntry = queueService.addToQueue(queueEntry);
         
         return new CheckInResponseDTO(
@@ -68,12 +72,14 @@ public class CheckInService {
     public CheckInResponseDTO checkInExistingCustomer(CheckInRequestDTO request) {
         Customer customer = findExistingCustomer(request);
         
-        // Add to queue
+        // Add to queue with preferred tech + service stamped on the entry
         Queue queueEntry = new Queue(
             customer.getId(),
             "Existing customer check-in"
         );
-        
+        queueEntry.setEmployeeId(request.getPreferredTechnicianId());
+        queueEntry.setServiceTypeId(request.getServiceTypeId());
+
         Queue savedQueueEntry = queueService.addToQueue(queueEntry);
         
         return new CheckInResponseDTO(
@@ -97,12 +103,14 @@ public class CheckInService {
     public CheckInResponseDTO checkInGuest(CheckInRequestDTO request) {
         Customer guest = createGuestCustomer(request);
         
-        // Add to queue
+        // Add to queue with preferred tech + service stamped on the entry
         Queue queueEntry = new Queue(
             guest.getId(),
             "Guest check-in"
         );
-        
+        queueEntry.setEmployeeId(request.getPreferredTechnicianId());
+        queueEntry.setServiceTypeId(request.getServiceTypeId());
+
         Queue savedQueueEntry = queueService.addToQueue(queueEntry);
 
         return new CheckInResponseDTO(

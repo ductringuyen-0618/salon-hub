@@ -38,6 +38,11 @@ public class Queue {
     
     @Column(name = "estimated_wait_time")
     private Integer estimatedWaitTime;
+
+    /** Optional — the requested service. When set, the wait-time scheduler
+     *  uses this service's estimatedDurationMinutes instead of the default. */
+    @Column(name = "service_type_id")
+    private Long serviceTypeId;
     
     @Column(name = "position")
     private Integer position;
