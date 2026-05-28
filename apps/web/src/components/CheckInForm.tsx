@@ -95,86 +95,99 @@ const CheckInForm = () => {
   const onSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
     setError(null);
-    const checkInResults: {name: string, queuePosition?: number}[] = [];
+    const checkInResults: { name: string; queuePosition?: number }[] = [];
+
+    // /api/checkin is documented as PUBLIC (see SECURITY-PERMISSIONS.md).
+    // Guest check-in must NOT require any login.
+    //
+    // Walk-ins with multiple people (party size > 1) used to be silently
+    // dropped — api.ts forwarded only the primary guest, so the
+    // `additionalPeople` UI was cosmetic. We now POST one /api/checkin per
+    // person so each gets their own queue entry, with partial-failure
+    // handling: if person 2 fails we still keep person 1's queue entry.
+    const isEmail = values.contact.includes('@');
+    const primary = {
+      name: values.name,
+      phoneNumber: isEmail ? undefined : values.contact,
+      email: isEmail ? values.contact : undefined,
+      preferredTechnician: values.technician,
+      notes: '',
+      requestedService: '',
+      guest: true,
+    };
+
+    // Build the people-to-check-in queue. Additional people share the contact
+    // with the primary so staff can reach the whole party with one phone number.
+    const peopleToCheckIn: Array<{ name: string; phoneNumber?: string; email?: string }> = [
+      primary,
+      ...additionalPeople.map(p => ({
+        name: p.name,
+        phoneNumber: primary.phoneNumber,
+        email: primary.email,
+        guest: true,
+      })),
+    ];
+
+    let firstResponse: any = null;
+    const failures: Array<{ name: string; reason: string }> = [];
 
     try {
-      // /api/checkin is documented as PUBLIC (see SECURITY-PERMISSIONS.md).
-      // Guest check-in must NOT require any login. Previously this block
-      // auto-logged-in with hardcoded admin credentials shipped in the JS
-      // bundle — a serious leak. That has been removed.
+      for (let i = 0; i < peopleToCheckIn.length; i++) {
+        const person = peopleToCheckIn[i];
+        try {
+          const resp = await apiService.checkIn({
+            name: person.name,
+            phoneNumber: person.phoneNumber,
+            email: person.email,
+            preferredTechnician: primary.preferredTechnician,
+            notes: '',
+            requestedService: '',
+            guest: true,
+          } as any);
+          if (i === 0) firstResponse = resp;
+          checkInResults.push({ name: person.name, queuePosition: resp.queuePosition });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Check-in failed';
+          failures.push({ name: person.name, reason: msg });
+          console.error(`[checkin] failed for ${person.name}:`, err);
+        }
+      }
 
-      // Prepare check-in data. The backend's CheckInRequestDTO requires a
-      // single `contact` field (phone or email); api.ts maps from these.
-      const isEmail = values.contact.includes('@');
-      const checkInData = {
-        name: values.name,
-        phoneNumber: isEmail ? '' : values.contact,
-        email: isEmail ? values.contact : '',
-        preferredTechnician: values.technician,
-        partySize: 1 + additionalPeople.length,
-        additionalPeople: additionalPeople.map(person => ({ name: person.name })),
-        notes: '',
-        requestedService: '',
-        guest: true,
-      };
+      if (checkInResults.length === 0) {
+        // Everyone failed. Surface the first error.
+        const reason = failures[0]?.reason || 'Check-in failed. Please try again.';
+        setError(reason);
+        showError('Check-in Failed', reason);
+        return;
+      }
 
-      console.log('Submitting check-in data:', checkInData);
-
-      // Use the main check-in endpoint
-      const response = await apiService.checkIn(checkInData);
-      
-      console.log('Check-in response:', response);
-      
-      // Handle successful check-in
-      setEstimatedWaitTime(response.estimatedWaitTime || 25);
-      setTotalQueueLength(response.queuePosition || 1);
-      
-      checkInResults.push({
-        name: values.name,
-        queuePosition: response.queuePosition
-      });
-      
-      // Add additional people to results
-      additionalPeople.forEach((person, index) => {
-        checkInResults.push({
-          name: person.name,
-          queuePosition: (response.queuePosition || 1) + index + 1
-        });
-      });
-      
+      // At least one succeeded → show success view. Display details about
+      // any partial failures so the user can re-try just those names.
+      const waitTime = firstResponse?.estimatedWaitTime ?? 25;
+      const firstPos = firstResponse?.queuePosition ?? 1;
+      setEstimatedWaitTime(waitTime);
+      setTotalQueueLength(firstPos);
       setSuccessfulCheckIns(checkInResults);
       setIsSuccess(true);
       form.reset();
       setAdditionalPeople([]);
-      
-      // Show success toast
+
       const totalPeople = checkInResults.length;
-      const waitTime = response.estimatedWaitTime || 25;
-      const message = totalPeople === 1 
-        ? `${checkInResults[0].name} has been checked in successfully. Queue position: ${response.queuePosition}. Estimated wait: ${waitTime} minutes.`
-        : `${totalPeople} people have been checked in successfully. Queue position: ${response.queuePosition}. Estimated wait: ${waitTime} minutes.`;
-      
-      success(message);
-      
-    } catch (error) {
-      console.error("Check-in error:", error);
-      
-      // Handle specific error types
-      let errorMessage = 'Check-in failed. Please try again.';
-      if (error instanceof Error) {
-        if (error.message.includes('Authentication failed')) {
-          errorMessage = 'Authentication failed. Please log in again.';
-        } else if (error.message.includes('Network')) {
-          errorMessage = 'Network error. Please check your connection and try again.';
-        } else if (error.message.includes('400')) {
-          errorMessage = 'Invalid information provided. Please check your details and try again.';
-        } else if (error.message.includes('500')) {
-          errorMessage = 'Server error. Please try again later.';
-        } else {
-          errorMessage = error.message || 'Check-in failed. Please try again.';
-        }
+      const successMsg = totalPeople === 1
+        ? `${checkInResults[0].name} has been checked in successfully. Queue position: ${firstPos}. Estimated wait: ${waitTime} minutes.`
+        : `${totalPeople} people checked in successfully. First position: ${firstPos}. Estimated wait: ${waitTime} minutes.`;
+      success(successMsg);
+
+      if (failures.length > 0) {
+        showError(
+          'Some people could not be checked in',
+          failures.map(f => `${f.name}: ${f.reason}`).join('; ')
+        );
       }
-      
+    } catch (error) {
+      // Unexpected outer-loop error (programmer bug, not an API failure).
+      console.error('Check-in onSubmit failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Check-in failed. Please try again.';
       setError(errorMessage);
       showError('Check-in Failed', errorMessage);
     } finally {

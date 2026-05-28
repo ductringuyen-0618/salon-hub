@@ -244,10 +244,12 @@ const CheckInPage = () => {
               <CardContent className="p-6 text-center">
                 <Users className="h-8 w-8 text-dynamic-primary mx-auto mb-3" />
                 <div className="text-2xl font-semibold text-dynamic-text mb-1">
-                  {queueStats.loading ? '--' : `${queueStats.totalWaiting} people`}
+                  {queueStats.loading
+                    ? '--'
+                    : `${queueStats.totalWaiting} ${queueStats.totalWaiting === 1 ? 'person' : 'people'}`}
                 </div>
                 <div className="text-sm text-dynamic-text-secondary">
-                  {queueStats.totalWaiting === 1 ? 'Ahead of You' : 'Ahead of You'}
+                  Currently waiting
                 </div>
               </CardContent>
             </Card>

@@ -143,7 +143,7 @@ public class CheckInService {
     
     private Customer createGuestCustomer(CheckInRequestDTO request) {
         String contactInfo = request.getPhoneOrEmail();
-        
+
         if (contactInfo == null || contactInfo.trim().isEmpty()) {
             throw new IllegalArgumentException("Contact information is required for guest check-in");
         }
@@ -152,29 +152,47 @@ public class CheckInService {
             throw new IllegalArgumentException("Name is required for guest check-in");
         }
 
-        // Check if a customer with this contact info already exists
-        Optional<Customer> existingCustomer = customerRepository.findByPhoneOrEmail(contactInfo, contactInfo);
-
-        if (existingCustomer.isPresent()) {
-            throw new IllegalArgumentException("A customer with this contact information already exists. Use existing customer check-in instead.");
-        }
+        // NOTE: We intentionally do NOT throw if a customer already exists
+        // with this phone/email. Walk-in parties — a parent + kids, a couple,
+        // friends — frequently share one phone number. Each party member
+        // gets their own Customer row + queue entry; the schema allows
+        // duplicate phone_number (it's not UNIQUE). The frontend posts one
+        // /api/checkin per party member; the second+ POST would have
+        // previously been rejected with 400.
 
         Customer guest = new Customer();
         guest.setName(request.getName().trim());
-        
-        // Set phone or email based on format
+
+        // Normalize empty strings to null. Customer.email has a UNIQUE
+        // constraint so we need null (not "") when no email is provided.
         if (request.isContactEmail()) {
-            guest.setEmail(contactInfo);
-            guest.setPhoneNumber(request.getPhoneNumber()); // May be null
+            guest.setEmail(blankToNull(contactInfo));
+            guest.setPhoneNumber(blankToNull(request.getPhoneNumber()));
         } else {
-            guest.setPhoneNumber(contactInfo);
-            guest.setEmail(request.getEmail()); // May be null
+            guest.setPhoneNumber(blankToNull(contactInfo));
+            guest.setEmail(blankToNull(request.getEmail()));
         }
-        
-        guest.setNote(request.getNote());
+
+        // For party members sharing an email: only the first guest with that
+        // email gets to keep it; subsequent guests in the party have it
+        // dropped to null so they don't collide on the UNIQUE index.
+        // Phone is allowed to repeat (no UNIQUE constraint).
+        if (guest.getEmail() != null) {
+            Optional<Customer> emailOwner =
+                customerRepository.findByPhoneOrEmail(guest.getEmail(), guest.getEmail());
+            if (emailOwner.isPresent()) {
+                guest.setEmail(null);
+            }
+        }
+
+        guest.setNote(blankToNull(request.getNote()));
         guest.setGuest(true);
 
         return customerRepository.save(guest);
+    }
+
+    private static String blankToNull(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim();
     }
 
     /**

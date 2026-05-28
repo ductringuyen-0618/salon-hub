@@ -568,15 +568,32 @@ class ApiService {
     // `guest`, NOT `isGuest`. Sending `isGuest:true` would leave the flag
     // false on the server, causing the request to fall into the
     // find-existing-customer branch and 400.
-    const requestBody = {
-      name: checkInData.name,
-      contact: checkInData.phoneNumber || checkInData.email || '',
-      phoneNumber: checkInData.phoneNumber || '',
-      email: checkInData.email || '',
-      note: checkInData.notes || '',
-      guest: checkInData.guest ?? true,
-      requestedService: checkInData.requestedService || ''
+    //
+    // Critically: send empty strings as `null` (omitted), because the
+    // Customer.email column has a unique constraint. Two guests with
+    // email="" would collide on the unique index and produce a 500.
+    const blankToUndef = (v?: string | null) => {
+      if (v == null) return undefined;
+      const t = String(v).trim();
+      return t.length === 0 ? undefined : t;
     };
+    const phone = blankToUndef(checkInData.phoneNumber);
+    const email = blankToUndef(checkInData.email);
+    const contact = phone || email;
+    if (!contact) {
+      throw new Error('Phone or email is required for check-in');
+    }
+    const requestBody: Record<string, any> = {
+      name: checkInData.name,
+      contact,
+      guest: checkInData.guest ?? true,
+    };
+    if (phone) requestBody.phoneNumber = phone;
+    if (email) requestBody.email = email;
+    const note = blankToUndef(checkInData.notes);
+    if (note) requestBody.note = note;
+    const service = blankToUndef(checkInData.requestedService);
+    if (service) requestBody.requestedService = service;
     
     return this.publicRequest<CheckInResponseDTO>('/checkin', {
       method: 'POST',
