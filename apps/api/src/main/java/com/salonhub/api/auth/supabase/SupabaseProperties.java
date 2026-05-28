@@ -21,5 +21,10 @@ public record SupabaseProperties(
 
         /** Expected `iss` claim on incoming tokens. Defaults to
          *  <url>/auth/v1. Used as a defense-in-depth check. */
-        String issuer
+        String issuer,
+
+        /** Service-role secret key. Required to call the admin API
+         *  (creating users with email_confirm=true and setting
+         *  app_metadata). Never expose to the frontend. */
+        String secretKey
 ) {}

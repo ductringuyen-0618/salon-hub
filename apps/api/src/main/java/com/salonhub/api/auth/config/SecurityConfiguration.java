@@ -70,6 +70,11 @@ public class SecurityConfiguration {
                                         // storefront name/hours/theme on
                                         // first paint; write is admin-only).
                                         "/api/settings",
+                                        // Tenant onboarding (public): anyone
+                                        // can spin up a new salon. PUT/DELETE
+                                        // /api/tenants are blocked by absence.
+                                        "/api/tenants",
+                                        "/api/tenants/check-slug",
                                         // Public booking endpoint (requires auth but any authenticated user can book)
                                         "/api/bookings",
                                         "/api/bookings/**",

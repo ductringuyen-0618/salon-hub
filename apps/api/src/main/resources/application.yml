@@ -54,3 +54,7 @@ supabase:
   url: ${SUPABASE_URL:#{null}}
   jwks-url: ${SUPABASE_JWKS_URL:#{null}}
   issuer: ${SUPABASE_ISSUER:#{null}}
+  # Service-role secret. Required for the tenant onboarding flow to create
+  # the first admin user via Supabase Admin API. Without it, /api/tenants
+  # POST will return 503.
+  secret-key: ${SUPABASE_SECRET_KEY:#{null}}

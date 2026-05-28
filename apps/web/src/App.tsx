@@ -21,6 +21,7 @@ const WaitListPage = lazy(() => import("./pages/WaitListPage"));
 const AdminSectionPlaceholder = lazy(() => import("./pages/AdminSectionPlaceholder"));
 const AdminSettingsPage = lazy(() => import("./pages/AdminSettingsPage"));
 const AdminServicesPage = lazy(() => import("./pages/AdminServicesPage"));
+const SignupPage = lazy(() => import("./pages/SignupPage"));
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
               <Route path="/check-in" element={<CheckInPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/signup" element={<SignupPage />} />
               <Route path="/services" element={<ServicesPage />} />
               <Route path="/booking" element={<BookingPage />} />
               <Route path="/book" element={<Navigate to="/booking" replace />} />

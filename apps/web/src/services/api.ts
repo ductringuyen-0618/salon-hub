@@ -440,6 +440,25 @@ class ApiService {
     return this.publicRequest<any>('/settings');
   }
 
+  /** Public — check if a tenant slug is available (signup-form live check). */
+  async checkTenantSlug(slug: string): Promise<{ slug: string; available: boolean }> {
+    return this.publicRequest(`/tenants/check-slug?slug=${encodeURIComponent(slug)}`);
+  }
+
+  /** Public — create a new tenant + first admin user (onboarding). */
+  async createTenant(payload: {
+    businessName: string;
+    slug: string;
+    adminEmail: string;
+    adminPassword: string;
+    adminName?: string;
+  }): Promise<{ tenantId: number; slug: string; businessName: string; adminEmail: string; adminReady: boolean }> {
+    return this.publicRequest('/tenants', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   /** ADMIN — updates the singleton business settings row. */
   async updateSettings(payload: any): Promise<any> {
     return this.request<any>('/settings', {

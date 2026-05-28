@@ -2,7 +2,10 @@ package com.salonhub.api.auth.supabase;
 
 import com.salonhub.api.auth.model.User;
 import com.salonhub.api.auth.repository.UserRepository;
+import com.salonhub.api.tenant.TenantContext;
+import com.salonhub.api.tenant.TenantSessionConfigurer;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
@@ -37,6 +40,9 @@ public class SupabaseJwtAuthenticationFilter
         implements Converter<Jwt, AbstractAuthenticationToken> {
 
     private final UserRepository userRepository;
+    /** Optional: only present when Hibernate filter is wired up. */
+    @Autowired(required = false)
+    private TenantSessionConfigurer sessionConfigurer;
 
     public SupabaseJwtAuthenticationFilter(UserRepository userRepository) {
         this.userRepository = userRepository;
@@ -53,6 +59,23 @@ public class SupabaseJwtAuthenticationFilter
             return null;
         }
 
+        // SECURITY: when the Supabase JWT carries an app_metadata.tenant_id
+        // claim, treat it as authoritative — overriding whatever
+        // TenantResolutionFilter set from the X-Tenant-Slug header. Without
+        // this, a logged-in admin of tenant A could spoof the header and
+        // see tenant B's data. The header is only trusted for ANONYMOUS
+        // requests (no JWT).
+        Long jwtTenantId = extractTenantId(jwt);
+        if (jwtTenantId != null) {
+            TenantContext.set(jwtTenantId);
+            // Re-prime the Hibernate filter against the corrected tenant
+            // so any query made downstream of this filter scopes correctly.
+            if (sessionConfigurer != null) {
+                sessionConfigurer.disable();
+                sessionConfigurer.enable(jwtTenantId);
+            }
+        }
+
         String email = jwt.getClaimAsString("email");
         User user = findOrCreateUser(supabaseUserId, email, jwt);
         if (user == null) {
@@ -63,6 +86,27 @@ public class SupabaseJwtAuthenticationFilter
                 new UsernamePasswordAuthenticationToken(user, jwt, user.getAuthorities());
         auth.setDetails(jwt);
         return auth;
+    }
+
+    /**
+     * Pull {@code tenant_id} out of Supabase's {@code app_metadata} claim.
+     * Returns null if the claim is absent or malformed — we don't fail the
+     * request in that case; we just leave whatever TenantResolutionFilter
+     * already set in TenantContext (typically the default tenant). This
+     * keeps the legacy seeded users (who don't have tenant_id stamped in
+     * their Supabase metadata) working under the default tenant.
+     */
+    private static Long extractTenantId(Jwt jwt) {
+        Object appMetadata = jwt.getClaims().get("app_metadata");
+        if (!(appMetadata instanceof Map<?, ?> m)) return null;
+        Object raw = m.get("tenant_id");
+        if (raw == null) return null;
+        try {
+            if (raw instanceof Number n) return n.longValue();
+            return Long.parseLong(raw.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     @Transactional
