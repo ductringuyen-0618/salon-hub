@@ -18,6 +18,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { 
   Crown, 
   Star, 
@@ -58,6 +59,8 @@ const formSchema = z
   });
 
 const RegisterPage = () => {
+  const { settings } = useSettings();
+  const businessName = settings.businessName || 'SalonHub';
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -117,7 +120,7 @@ const RegisterPage = () => {
               <CardContent className="p-12">
                 <CheckCircle className="h-24 w-24 text-green-500 mx-auto mb-6" />
                 <h1 className="text-3xl font-light text-dynamic-text mb-4">
-                  Welcome to Five Nails & Spa!
+                  Welcome to {businessName}!
                 </h1>
                 <p className="text-dynamic-text-secondary text-lg mb-8">
                   Your member account has been created successfully. You can now enjoy all our exclusive benefits and premium services.

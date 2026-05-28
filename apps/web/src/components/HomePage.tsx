@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Navigation from '@/components/Navigation';
+import { useSettings } from '@/contexts/SettingsContext';
 import {
   Sparkles,
   Clock,
@@ -19,6 +20,9 @@ import {
 
 const HomePage = () => {
   const navigate = useNavigate();
+  const { settings } = useSettings();
+  const businessName = settings.businessName || 'SalonHub';
+  const tagline = settings.tagline || 'Premium Wellness Experience';
 
   const features = [
     {
@@ -84,8 +88,8 @@ const HomePage = () => {
   return (
     <div className="min-h-screen bg-dynamic-background">
       <Navigation
-        title="Five Nails & Spa"
-        subtitle="Premium Wellness Experience"
+        title={businessName}
+        subtitle={tagline}
       />
 
       {/* Hero Section */}
@@ -147,7 +151,7 @@ const HomePage = () => {
       <section className="py-20 px-4 bg-dynamic-surface">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-light text-dynamic-text mb-4">Why Choose Five Nails & Spa</h2>
+            <h2 className="text-4xl font-light text-dynamic-text mb-4">Why Choose {businessName}</h2>
             <p className="text-xl text-dynamic-text-secondary max-w-2xl mx-auto">
               We combine luxury, expertise, and wellness to create an unparalleled experience
             </p>
@@ -275,17 +279,16 @@ const HomePage = () => {
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="col-span-1 md:col-span-2">
-              <h3 className="text-2xl font-light text-dynamic-text mb-4">Five Nails & Spa</h3>
+              <h3 className="text-2xl font-light text-dynamic-text mb-4">{businessName}</h3>
               <p className="text-dynamic-text-secondary mb-4 max-w-md">
-                Your premier destination for luxury nail care and wellness treatments. 
-                Experience the art of relaxation in our serene sanctuary.
+                {tagline || 'Your premier destination for luxury nail care and wellness treatments. Experience the art of relaxation in our serene sanctuary.'}
               </p>
               <div className="flex items-center gap-2 text-dynamic-text-secondary">
                 <CheckCircle className="h-4 w-4 text-dynamic-primary" />
                 <span className="text-sm">Licensed & Insured</span>
               </div>
             </div>
-            
+
             <div>
               <h4 className="font-medium text-dynamic-text mb-4">Quick Links</h4>
               <div className="space-y-2">
@@ -294,21 +297,23 @@ const HomePage = () => {
                 <Link to="/check-in" className="block text-dynamic-text-secondary hover:text-dynamic-primary transition-colors">Check In</Link>
               </div>
             </div>
-            
+
             <div>
               <h4 className="font-medium text-dynamic-text mb-4">Contact</h4>
               <div className="space-y-2 text-dynamic-text-secondary text-sm">
-                <p>123 Wellness Drive</p>
-                <p>Spa City, SC 12345</p>
-                <p>(555) 123-4567</p>
-                <p>info@fivenailsspa.com</p>
+                {settings.contactAddress && <p style={{ whiteSpace: 'pre-line' }}>{settings.contactAddress}</p>}
+                {settings.contactPhone && <p>{settings.contactPhone}</p>}
+                {settings.contactEmail && <p>{settings.contactEmail}</p>}
+                {!settings.contactAddress && !settings.contactPhone && !settings.contactEmail && (
+                  <p className="italic text-dynamic-text-secondary/60">Contact info not yet configured</p>
+                )}
               </div>
             </div>
           </div>
-          
+
           <div className="border-t border-dynamic-border mt-8 pt-8 text-center">
             <p className="text-dynamic-text-secondary text-sm">
-              © 2024 Five Nails & Spa. All rights reserved.
+              © {new Date().getFullYear()} {businessName}. All rights reserved.
             </p>
           </div>
         </div>

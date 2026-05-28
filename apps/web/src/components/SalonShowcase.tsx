@@ -3,20 +3,23 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useSettings } from "@/contexts/SettingsContext";
 
 const SalonShowcase = () => {
   const navigate = useNavigate();
+  const { settings } = useSettings();
+  const businessName = settings.businessName || 'SalonHub';
+  const tagline = settings.tagline || 'Experience luxury nail care in a relaxing environment. Our skilled technicians provide exceptional service using premium products.';
 
   return (
     <div className="w-full max-w-6xl mx-auto">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
         <div className="space-y-6">
           <h1 className="text-4xl md:text-5xl font-bold text-primary">
-            Five Nails & Spa
+            {businessName}
           </h1>
           <p className="text-xl text-muted-foreground">
-            Experience luxury nail care in a relaxing environment. Our skilled
-            technicians provide exceptional service using premium products.
+            {tagline}
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             <Button
@@ -42,7 +45,7 @@ const SalonShowcase = () => {
           <CardContent className="p-0">
             <img
               src="https://images.unsplash.com/photo-1610992015732-2449b76344bc?w=800&q=80"
-              alt="Five Nails & Spa"
+              alt={businessName}
               className="w-full h-[300px] object-cover"
             />
           </CardContent>

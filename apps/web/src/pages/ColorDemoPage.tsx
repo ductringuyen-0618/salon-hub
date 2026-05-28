@@ -2,11 +2,14 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import ColorThemeSelector from '../components/ColorThemeSelector';
 import { useColorTheme } from '../hooks/useColorTheme';
+import { useSettings } from '@/contexts/SettingsContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 
 const ColorDemoPage: React.FC = () => {
   const { currentTheme } = useColorTheme();
+  const { settings } = useSettings();
+  const businessName = settings.businessName || 'SalonHub';
 
   return (
     <div className="min-h-screen bg-dynamic-background">
@@ -16,7 +19,7 @@ const ColorDemoPage: React.FC = () => {
           <div className="flex justify-between items-center">
             <Link to="/">
               <h1 className="text-3xl font-bold text-dynamic-primary hover:text-dynamic-primary transition-colors">
-                Five Nails & Spa
+                {businessName}
               </h1>
             </Link>
             <Link 

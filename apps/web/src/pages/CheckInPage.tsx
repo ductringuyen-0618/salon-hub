@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { apiService } from "@/services/api";
+import { useSettings } from "@/contexts/SettingsContext";
 import { 
   UserCheck, 
   Users, 
@@ -21,6 +22,8 @@ import {
 } from "lucide-react";
 
 const CheckInPage = () => {
+  const { settings } = useSettings();
+  const businessName = settings.businessName || 'SalonHub';
   const [showMemberLogin, setShowMemberLogin] = useState(false);
   const [queueStats, setQueueStats] = useState({
     totalWaiting: 3,
@@ -142,7 +145,7 @@ const CheckInPage = () => {
               
               <h1 className="text-3xl md:text-4xl font-light text-dynamic-text mb-4">
                 Welcome to
-                <span className="text-dynamic-primary font-light italic block">Five Nails & Spa</span>
+                <span className="text-dynamic-primary font-light italic block">{businessName}</span>
               </h1>
               
               <p className="text-lg text-dynamic-text-secondary leading-relaxed">
@@ -299,7 +302,7 @@ const CheckInPage = () => {
                   First Time Visiting?
                 </h3>
                 <p className="text-dynamic-text-secondary mb-6 max-w-2xl mx-auto">
-                  Welcome to Five Nails & Spa! We're excited to provide you with an exceptional experience. 
+                  Welcome to {businessName}! We're excited to provide you with an exceptional experience.
                   Our expert technicians will ensure you receive the highest quality care in our relaxing environment.
                 </p>
                 
