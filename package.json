@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "concurrently -n api,web -c blue,green \"npm:api:dev\" \"npm:web:dev\"",
     "build": "npm run api:build && npm run web:build",
+    "lint": "npm run web:lint",
     "test": "npm run api:test && npm run web:test",
-    "ci": "npm run web:install && npm test && npm run build",
+    "ci": "npm run web:install && npm run lint && npm test && npm run build",
+    "verify:web": "npm run web:lint && npm run web:test && npm run web:build",
     "api:dev": "cd apps/api && gradlew bootRun",
     "api:build": "cd apps/api && gradlew bootJar",
     "api:test": "cd apps/api && gradlew test",

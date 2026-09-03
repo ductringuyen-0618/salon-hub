@@ -77,10 +77,11 @@ export const mockApi = {
       case '/bookings':
         return { data: mockBookings };
 
-      case '/bookings/today':
+      case '/bookings/today': {
         const today = new Date().toISOString().split('T')[0];
         const todayBookings = mockBookings.filter(b => b.date === today);
         return { data: todayBookings };
+      }
 
       default:
         throw {

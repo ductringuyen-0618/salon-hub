@@ -50,15 +50,31 @@ npm run dev              # starts api + web in parallel
 
 ## Common scripts
 
-| Script              | What it does                            |
-| ------------------- | --------------------------------------- |
-| `npm run dev`       | Run api and web in parallel             |
-| `npm run api:dev`   | `./gradlew bootRun` inside `apps/api`   |
-| `npm run api:build` | `./gradlew build` inside `apps/api`     |
-| `npm run api:test`  | `./gradlew test` inside `apps/api`      |
-| `npm run web:dev`   | `npm run dev` inside `apps/web`         |
-| `npm run web:build` | `npm run build` inside `apps/web`       |
-| `npm run web:test`  | `npm test` inside `apps/web`            |
+| Script                | What it does                                          |
+| ---------------------- | ------------------------------------------------------ |
+| `npm run dev`         | Run api and web in parallel                           |
+| `npm run api:dev`     | `./gradlew bootRun` inside `apps/api`                 |
+| `npm run api:build`   | `./gradlew bootJar` inside `apps/api`                 |
+| `npm run api:test`    | `./gradlew test` inside `apps/api`                    |
+| `npm run web:dev`     | `npm run dev` inside `apps/web`                       |
+| `npm run web:build`   | `tsc && vite build` inside `apps/web`                 |
+| `npm run web:test`    | `vitest run --passWithNoTests` inside `apps/web`      |
+| `npm run web:lint`    | `eslint .` inside `apps/web`                          |
+| `npm run lint`        | Alias for `web:lint`                                  |
+| `npm run test`        | `api:test` then `web:test`                            |
+| `npm run build`       | `api:build` then `web:build`                          |
+| `npm run verify:web`  | `web:lint` → `web:test` → `web:build` (no JDK needed) |
+| `npm run ci`          | Full gate: install → lint → test → build (needs a JDK for `api:test`) |
+
+## Verification loop
+
+Before committing, run the loop appropriate to what you touched:
+
+- **Web-only change:** `npm run verify:web` from the repo root, or `npm run lint && npm run test:ci && npm run build` from `apps/web`. Needs only Node 20+; no JDK required.
+- **API-only or full-stack change:** `npm run ci` from the repo root. Needs JDK 17+ (`apps/api` won't build or test without it) and, for `api:integration-test`, a reachable Postgres (`apps/api/docker-compose.yml` starts one locally).
+- **CI:** `.github/workflows/web-ci.yml` and `.github/workflows/api-ci.yml` run the same checks on every push/PR touching their respective `apps/*` path. Web CI now fails on lint errors (it used to ignore them); API CI runs unit + integration tests against a Postgres service container before building the jar.
+
+`apps/web/eslint.config.js` excludes `src/components/ui` (shadcn-generated primitives) and `src/stories` (tempo-devtools scaffolding) from lint since neither is hand-authored app code. `npm run lint` (used in CI) fails only on lint errors; `apps/web`'s `lint:strict` also enforces zero warnings, for anyone burning down the pre-existing `no-explicit-any`/`no-unused-vars`/`exhaustive-deps` warning backlog.
 
 ## History
 

@@ -146,7 +146,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (e: any) {
       const msg = e?.message || 'Login failed';
       setError(msg);
-      throw new Error(msg);
+      throw new Error(msg, { cause: e });
     } finally {
       setLoading(false);
     }
@@ -183,7 +183,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (e: any) {
       const msg = e?.message || 'Registration failed';
       setError(msg);
-      throw new Error(msg);
+      throw new Error(msg, { cause: e });
     } finally {
       setLoading(false);
     }

@@ -72,7 +72,7 @@ export const clearAuthData = (): void => {
 /**
  * Get authorization header for API requests
  */
-export const getAuthHeader = (): { Authorization: string } | {} => {
+export const getAuthHeader = (): { Authorization: string } | Record<string, never> => {
   const token = localStorage.getItem(AUTH_STORAGE_KEYS.TOKEN);
   return token ? { Authorization: `Bearer ${token}` } : {};
 };

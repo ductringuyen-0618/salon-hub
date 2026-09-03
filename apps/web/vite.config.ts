@@ -27,7 +27,7 @@ export default defineConfig({
     },
   },
   server: {
-    // @ts-ignore
+    // @ts-expect-error - `true` is valid at runtime but not in Vite's server.allowedHosts type
     allowedHosts: true,
   },
   build: {
