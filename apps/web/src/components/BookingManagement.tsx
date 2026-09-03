@@ -65,7 +65,7 @@ const BookingManagement = () => {
 
   // Filter bookings based on search term, status, and date
   useEffect(() => {
-    let filtered = bookings.filter(booking => {
+    const filtered = bookings.filter(booking => {
       const matchesSearch = 
         booking.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         booking.customerEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||

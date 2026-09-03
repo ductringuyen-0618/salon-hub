@@ -104,7 +104,7 @@ describe('CheckInForm', () => {
     it('should render technician combobox', async () => {
       render(<CheckInForm />);
 
-      const technicianSelect = screen.getByRole('combobox');
+      const technicianSelect = screen.getByRole('combobox', { name: /technician/i });
       expect(technicianSelect).toBeInTheDocument();
     });
 

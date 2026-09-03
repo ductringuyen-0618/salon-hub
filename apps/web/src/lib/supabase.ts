@@ -31,7 +31,6 @@ export const supabase: SupabaseClient = createClient(
 
 if (!supabaseConfigured) {
   // Surface the misconfig once so dev knows
-  // eslint-disable-next-line no-console
   console.warn(
     '[supabase] VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY not set. ' +
     'Auth flows will not work until these are configured.'

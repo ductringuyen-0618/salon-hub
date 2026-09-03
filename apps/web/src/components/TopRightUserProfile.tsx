@@ -12,11 +12,8 @@ import {
   Home
 } from 'lucide-react';
 
-interface TopRightUserProfileProps {
-  // Remove props since we'll get auth state directly from context
-}
-
-const TopRightUserProfile: React.FC<TopRightUserProfileProps> = () => {
+// No props: auth state comes directly from context.
+const TopRightUserProfile: React.FC = () => {
   const { logout, isAuthenticated, user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();

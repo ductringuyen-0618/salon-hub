@@ -658,51 +658,6 @@ const BookingPage = () => {
                       )}
                     </div>
                   )}
-
-                  {/* Old Employee Selection (replaced above) */}
-                  {false && selectedDate && selectedTime && (
-                    <div className="mt-8">
-                      <h3 className="text-xl font-medium text-dynamic-text mb-4">Choose Your Technician (Optional)</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div
-                          className={cn(
-                            "border rounded-xl p-4 cursor-pointer transition-all duration-200",
-                            selectedEmployee === '' ? "border-dynamic-primary bg-dynamic-primary/5" : "border-dynamic-border hover:border-dynamic-primary/50"
-                          )}
-                          onClick={() => setSelectedEmployee('')}
-                        >
-                          <div className="text-center">
-                            <Users className="h-8 w-8 mx-auto mb-2 text-dynamic-primary" />
-                            <p className="font-medium text-dynamic-text">No Preference</p>
-                            <p className="text-sm text-dynamic-text-secondary">Any available technician</p>
-                          </div>
-                        </div>
-                        
-                        {employees.filter(emp => emp.available).map((employee) => (
-                          <div
-                            key={employee.id}
-                            className={cn(
-                              "border rounded-xl p-4 cursor-pointer transition-all duration-200",
-                              selectedEmployee === employee.id ? "border-dynamic-primary bg-dynamic-primary/5" : "border-dynamic-border hover:border-dynamic-primary/50"
-                            )}
-                            onClick={() => setSelectedEmployee(employee.id)}
-                          >
-                            <div className="text-center">
-                              <User className="h-8 w-8 mx-auto mb-2 text-dynamic-primary" />
-                              <p className="font-medium text-dynamic-text">{employee.name}</p>
-                              <p className="text-xs text-dynamic-text-secondary">
-                                {(employee.specialties && employee.specialties.length > 0)
-                                  ? employee.specialties.join(', ')
-                                  : (employee.role
-                                    ? employee.role.replace('_', ' ').toLowerCase()
-                                    : 'Available')}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
 

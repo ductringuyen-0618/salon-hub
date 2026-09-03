@@ -113,7 +113,7 @@ function App() {
               {/* Catch all route - redirect to home */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-            {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
+            {useRoutes(import.meta.env.VITE_TEMPO === "true" ? routes : [])}
           </>
         </Suspense>
       </ToastProvider>
