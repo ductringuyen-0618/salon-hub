@@ -1,7 +1,9 @@
 # salon-hub COO -- State
 
-Shipped: 0/0
+Shipped: 1/1
 
 ## Log
 - 2026-09-10: connected to agent-os; no proposals yet.
 - 2026-09-10: proposed docs/missions/coo/proposals/001-staff-management.md (Staff Management admin page).
+- 2026-09-12: approved via GitHub issue #3; built, validated, PR #4 opened.
+- 2026-09-12: shipped docs/missions/coo/proposals/001-staff-management.md — PR #4 CI green (build-test success), awaiting human merge. Report: docs/missions/coo/reports/001-staff-management.md.
