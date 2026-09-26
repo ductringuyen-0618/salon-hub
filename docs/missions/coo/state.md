@@ -10,3 +10,4 @@ Shipped: 1/1
 - 2026-09-13: proposed docs/missions/coo/proposals/002-my-appointments.md (My Appointments customer self-service page).
 - 2026-09-20: no decision in 7 days on docs/missions/coo/proposals/002-my-appointments.md — expired, issue #5 closed.
 - 2026-09-20: proposed docs/missions/coo/proposals/003-admin-bookings.md (Admin Bookings staff schedule & management page).
+- 2026-09-26: no decision yet on docs/missions/coo/proposals/003-admin-bookings.md (6 days old) — posted 2nd reminder on issue #6, expires 2026-09-27 if still undecided.
