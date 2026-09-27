@@ -1,6 +1,6 @@
 ---
 status: in_progress
-attempts: 0
+attempts: 1
 branch: coo/admin-bookings
 ---
 # Admin Bookings (staff schedule & management page)
@@ -50,3 +50,10 @@ M — one new read endpoint plus a small repository/service addition and tests o
 - Returning literally every appointment with no default range could get slow for a long-lived salon; defaulting the page's initial load to "today" (using the new `from`/`to` params) avoids this without needing pagination for v1.
 - Decide how granular status actions should be in the UI (e.g. expose every `BookingStatus` value vs. just "complete"/"no-show"/"cancel"); proposing the small, common set for v1 and leaving full status editing to the existing `PUT /{id}` update flow if staff need it.
 - `/admin/staff` is mid-flight on another branch (`coo/staff-management`, PR #4, not yet merged); this proposal only touches `/admin/bookings` and shares no files with that work, so there's no merge conflict risk.
+
+## Attempt 1 notes
+Built and pushed (branch `coo/admin-bookings`, PR #7). Web CI (`web-ci.yml`) is green. API CI (`api-ci.yml`, job `build-test`) is red, but **not because of this change**: `111 tests completed, 42 failed`, entirely in classes this PR doesn't touch (`ServiceTypeControllerTest`, `QueueControllerTest`, `QueueServiceImplTest`, `SecuritySystemTest`, `SimpleAuthTest`, `CheckInServiceTest`), plus 3 of my own new `AppointmentControllerTest` cases failing the same way as the 2 pre-existing ones in that file. Root cause: every `@WebMvcTest`/`@SpringBootTest` class fails with `NoSuchBeanDefinitionException: UserRepository` while instantiating `SupabaseJwtAuthenticationFilter` — its `@ConditionalOnProperty(name = "supabase.jwks-url")` appears to match the literal string `"#{null}"` (the `${SUPABASE_JWKS_URL:#{null}}` YAML default isn't SpEL-evaluated outside `@Value`), so the filter always activates and can't autowire `UserRepository` in sliced test contexts.
+
+Confirmed pre-existing via `git stash` (unmodified `main` produces the identical failure) and via a from-scratch local run against real Postgres 16 (not just CI's container) — byte-for-byte the same 42 failures. Commit `53e8244a` already documented "CI has been red since May for both Web CI and API CI... apps/api is left untouched"; Actions history confirms API CI hasn't passed since May 28. Separately found (also pre-existing, also unrelated): the custom `integrationTest` Gradle task is missing `useJUnitPlatform()` and silently runs 0 tests.
+
+Posted a standing-down comment on PR #7 (https://github.com/ductringuyen-0618/salon-hub/pull/7#issuecomment-5858644150) rather than attempting a fix — it's shared auth/build infrastructure, unrelated to appointments, and deserves its own reviewed proposal. This proposal stays `in_progress`, not `shipped`, until API CI is actually green (either that infra issue gets fixed upstream, or someone decides otherwise).
