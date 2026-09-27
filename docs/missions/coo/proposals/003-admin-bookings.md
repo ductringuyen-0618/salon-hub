@@ -1,7 +1,7 @@
 ---
-status: approved
+status: in_progress
 attempts: 0
-branch: null
+branch: coo/admin-bookings
 ---
 # Admin Bookings (staff schedule & management page)
 
