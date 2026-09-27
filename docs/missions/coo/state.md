@@ -11,3 +11,4 @@ Shipped: 1/1
 - 2026-09-20: no decision in 7 days on docs/missions/coo/proposals/002-my-appointments.md — expired, issue #5 closed.
 - 2026-09-20: proposed docs/missions/coo/proposals/003-admin-bookings.md (Admin Bookings staff schedule & management page).
 - 2026-09-26: no decision yet on docs/missions/coo/proposals/003-admin-bookings.md (6 days old) — posted 2nd reminder on issue #6, expires 2026-09-27 if still undecided.
+- 2026-09-27: approved via GitHub issue #6 ("Approve" comment from repo owner); built and validated, PR #7 opened (branch coo/admin-bookings). API CI expected to be red on this PR for pre-existing, unrelated reasons (see PR #7 description) — CI still pending, not yet shipped.
