@@ -21,6 +21,7 @@ const WaitListPage = lazy(() => import("./pages/WaitListPage"));
 const AdminSectionPlaceholder = lazy(() => import("./pages/AdminSectionPlaceholder"));
 const AdminSettingsPage = lazy(() => import("./pages/AdminSettingsPage"));
 const AdminServicesPage = lazy(() => import("./pages/AdminServicesPage"));
+const AdminStaffPage = lazy(() => import("./pages/AdminStaffPage"));
 const SignupPage = lazy(() => import("./pages/SignupPage"));
 
 function App() {
@@ -72,7 +73,7 @@ function App() {
               } />
               <Route path="/admin/staff" element={
                 <ProtectedRoute requireAdmin={true}>
-                  <AdminSectionPlaceholder title="Staff Management" description="Add, edit, and manage your team of technicians, front-desk staff, and managers. Currently you can use the seed users and modify roles via the backend." />
+                  <AdminStaffPage />
                 </ProtectedRoute>
               } />
               <Route path="/admin/services" element={
