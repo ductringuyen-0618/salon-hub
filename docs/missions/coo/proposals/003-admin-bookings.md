@@ -1,6 +1,6 @@
 ---
 status: in_progress
-attempts: 1
+attempts: 2
 branch: coo/admin-bookings
 ---
 # Admin Bookings (staff schedule & management page)
@@ -57,3 +57,20 @@ Built and pushed (branch `coo/admin-bookings`, PR #7). Web CI (`web-ci.yml`) is 
 Confirmed pre-existing via `git stash` (unmodified `main` produces the identical failure) and via a from-scratch local run against real Postgres 16 (not just CI's container) — byte-for-byte the same 42 failures. Commit `53e8244a` already documented "CI has been red since May for both Web CI and API CI... apps/api is left untouched"; Actions history confirms API CI hasn't passed since May 28. Separately found (also pre-existing, also unrelated): the custom `integrationTest` Gradle task is missing `useJUnitPlatform()` and silently runs 0 tests.
 
 Posted a standing-down comment on PR #7 (https://github.com/ductringuyen-0618/salon-hub/pull/7#issuecomment-5858644150) rather than attempting a fix — it's shared auth/build infrastructure, unrelated to appointments, and deserves its own reviewed proposal. This proposal stays `in_progress`, not `shipped`, until API CI is actually green (either that infra issue gets fixed upstream, or someone decides otherwise).
+
+## Attempt 2 notes
+Went back in to actually fix the root cause instead of just standing down, since it was blocking this PR and turned out to be a small, well-scoped config bug — not the kind of change that belongs in its own proposal. Pushed 4 commits to `coo/admin-bookings`:
+
+1. **`fix(api): stop supabase.jwks-url/secret-key from always activating`** — `@ConditionalOnProperty` reads the environment directly and doesn't SpEL-evaluate the `${VAR:#{null}}` idiom the way `@Value` does, so an unset `SUPABASE_JWKS_URL`/`SUPABASE_SECRET_KEY` resolved to the literal string `"#{null}"` — present and non-`"false"` — meaning `SupabaseJwtAuthenticationFilter` (needs `UserRepository`) was *always* active regardless of env vars. This was last fire's reported root cause.
+2. **`fix(api): run integrationTest under JUnit 5`** — the `integrationTest` Gradle task was missing `useJUnitPlatform()`, so it silently ran 0 tests (also previously identified, now actually fixed).
+3. Fixing #1 surfaced the *same* bug one layer up: `spring.security.oauth2.resourceserver.jwt.jwk-set-uri`/`issuer-uri` had the identical `#{null}` default, so once the `UserRepository` failure was gone, OAuth2 resource server auto-config tried to build a `NimbusJwtDecoder` from the literal string `"#{null}"` and blew up with `MalformedURLException`. Fixed the same way (left the keys out when unset).
+4. That in turn surfaced **`TenantResolutionFilter`** (a plain `Filter` bean, which `@WebMvcTest` slices always include) failing to construct because its `TenantService`/`TenantSessionConfigurer` deps aren't available in a slice context — `test(api): mock TenantService/TenantSessionConfigurer in TestSecurityConfig` fixes this centrally since `TestSecurityConfig` is already imported by the affected controller tests.
+5. That in turn surfaced a **real production bug**, not a test artifact: `GlobalExceptionHandler` had no handler for `AccessDeniedException`/`AuthorizationDeniedException`, so every `@PreAuthorize` denial fell through to the catch-all and returned 500 instead of 403 — caught by my own new `AppointmentControllerTest` 403 cases, the first tests in the suite to actually exercise a `@PreAuthorize` denial end-to-end. `fix(api): return 403 instead of 500 for @PreAuthorize denials` fixes this for every role-protected endpoint in the app, not just appointments.
+
+Result: `./gradlew test` failures went from 42 → 15. Verified locally against real Postgres 16 (JDK 21, since this sandbox has no JDK 17 — same environment gap noted in Attempt 1; CI itself uses JDK 17 via `actions/setup-java@v4`). The remaining 15 are two classes I did **not** touch, confirmed unrelated to appointments/tenancy/auth wiring:
+- `SimpleAuthTest` + `SecuritySystemTest` (7 tests) — share one `@SpringBootTest` H2 context key; the real failure is `SimpleAuthTest`'s `StaleObjectStateException` merging `Tenant#1` (looks like a seed-data/tenant-bootstrap mismatch when Flyway is disabled for that test), which then poisons the cached context for `SecuritySystemTest` too. Neither test touches appointments.
+- `QueueServiceImplTest` + `CheckInServiceTest` (8 tests) — plain Mockito unit tests with stale setup (`WaitTimeEstimator` not mocked; `CheckInService` behavior has drifted from its test's expectations). Pure Queue/CheckIn business-logic drift, unrelated to this PR.
+
+`./gradlew integrationTest` could not be verified locally — the 7 integration test classes need Testcontainers/Docker, and this sandbox has no Docker daemon available (`dockerd` fails to start: `ulimit: error setting limit (Operation not permitted)`). They compile cleanly (`compileIntegrationTestJava` succeeds). CI's `ubuntu-latest` runner has Docker available by default, so this should run for real there; watching the actual PR CI run to confirm. `./gradlew bootJar` succeeds locally.
+
+Pushed and watching PR #7's CI. If it comes back red again, that's Attempt 3; if still red after that, this goes `blocked` rather than guessing further.
