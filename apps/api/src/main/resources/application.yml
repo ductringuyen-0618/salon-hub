@@ -17,13 +17,19 @@ spring:
   # When SUPABASE_JWKS_URL is set, Spring auto-configures a JwtDecoder that
   # fetches the JWKS from Supabase and verifies ES256 signatures. The
   # SupabaseJwtAuthenticationFilter then maps the verified JWT to a local User.
-  # SpEL null defaults so auto-config is skipped when env unset.
+  #
+  # jwk-set-uri / issuer-uri are deliberately left out when unset rather
+  # than given a `${VAR:#{null}}` default — see the `supabase:` block below
+  # for why that idiom doesn't skip auto-config here: with it, resource
+  # server auto-config still sees the property as present (resolved to the
+  # literal string "#{null}") and tries to build a NimbusJwtDecoder from it,
+  # failing with MalformedURLException. Leaving the keys out lets relaxed
+  # env-var binding supply them only when SUPABASE_JWKS_URL/SUPABASE_ISSUER
+  # are actually set.
   security:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: ${SUPABASE_JWKS_URL:#{null}}
-          issuer-uri: ${SUPABASE_ISSUER:#{null}}
           # Supabase signs with ES256 (asymmetric ECDSA P-256).
           # Spring's default only accepts RS256 unless we list ES256 here.
           jws-algorithms: ES256
@@ -50,11 +56,18 @@ salon-hub:
 
 # Supabase Auth config (consumed by SupabaseProperties).
 # The SupabaseJwtAuthenticationFilter only activates when jwks-url is set.
+#
+# jwks-url and secret-key are deliberately NOT given a `${VAR:#{null}}`
+# default here: that default-value syntax is only SpEL-evaluated inside
+# @Value, not for plain property lookups. @ConditionalOnProperty (which
+# gates SupabaseJwtAuthenticationFilter and SupabaseAdminClient below)
+# reads the property directly, so a `#{null}` default would resolve to
+# the literal string "#{null}" — present and non-"false" — and the
+# conditional would always match even with no env var set. Leaving the
+# keys out entirely when unset lets Spring's relaxed env-var binding
+# populate them only when SUPABASE_JWKS_URL / SUPABASE_SECRET_KEY are
+# actually set, which is what @ConditionalOnProperty needs to see them
+# as genuinely absent.
 supabase:
   url: ${SUPABASE_URL:#{null}}
-  jwks-url: ${SUPABASE_JWKS_URL:#{null}}
   issuer: ${SUPABASE_ISSUER:#{null}}
-  # Service-role secret. Required for the tenant onboarding flow to create
-  # the first admin user via Supabase Admin API. Without it, /api/tenants
-  # POST will return 503.
-  secret-key: ${SUPABASE_SECRET_KEY:#{null}}

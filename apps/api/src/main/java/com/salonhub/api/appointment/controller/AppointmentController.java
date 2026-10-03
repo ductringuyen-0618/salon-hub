@@ -5,9 +5,11 @@ import com.salonhub.api.appointment.dto.AppointmentResponseDTO;
 import com.salonhub.api.appointment.service.AppointmentService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -31,6 +33,14 @@ public class AppointmentController {
     @PreAuthorize("hasAnyRole('FRONT_DESK', 'MANAGER', 'ADMIN')")
     public ResponseEntity<AppointmentResponseDTO> create(@Valid @RequestBody AppointmentRequestDTO dto) {
         return ResponseEntity.ok(service.book(dto));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('FRONT_DESK', 'MANAGER', 'ADMIN')")
+    public ResponseEntity<List<AppointmentResponseDTO>> getAll(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(service.listAll(from, to));
     }
 
     @GetMapping("/{id}")
