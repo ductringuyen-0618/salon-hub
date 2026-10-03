@@ -1,6 +1,6 @@
 ---
 status: in_progress
-attempts: 2
+attempts: 1
 branch: coo/admin-bookings
 ---
 # Admin Bookings (staff schedule & management page)
@@ -57,20 +57,3 @@ Built and pushed (branch `coo/admin-bookings`, PR #7). Web CI (`web-ci.yml`) is 
 Confirmed pre-existing via `git stash` (unmodified `main` produces the identical failure) and via a from-scratch local run against real Postgres 16 (not just CI's container) — byte-for-byte the same 42 failures. Commit `53e8244a` already documented "CI has been red since May for both Web CI and API CI... apps/api is left untouched"; Actions history confirms API CI hasn't passed since May 28. Separately found (also pre-existing, also unrelated): the custom `integrationTest` Gradle task is missing `useJUnitPlatform()` and silently runs 0 tests.
 
 Posted a standing-down comment on PR #7 (https://github.com/ductringuyen-0618/salon-hub/pull/7#issuecomment-5858644150) rather than attempting a fix — it's shared auth/build infrastructure, unrelated to appointments, and deserves its own reviewed proposal. This proposal stays `in_progress`, not `shipped`, until API CI is actually green (either that infra issue gets fixed upstream, or someone decides otherwise).
-
-## Attempt 2 notes
-Went back in on the pre-existing API CI failure from Attempt 1 rather than leaving it for a separate proposal — it turned out to be small and well-scoped enough to fix directly. Root cause chain (each layer only became visible once the layer below it was fixed):
-
-1. `supabase.jwks-url` / `supabase.secret-key` used a `${VAR:#{null}}` YAML default. That idiom is only SpEL-evaluated inside `@Value`, not for plain property lookups, so `@ConditionalOnProperty` (gating `SupabaseJwtAuthenticationFilter`, which needs `UserRepository`) saw the literal string `"#{null}"` — present and non-`"false"` — so the filter was always active regardless of env vars. This broke every `@WebMvcTest`/`@SpringBootTest` class.
-2. The Gradle `integrationTest` task was missing `useJUnitPlatform()`, so it silently ran 0 tests.
-3. Fixing #1 surfaced the identical bug one layer up: `spring.security.oauth2.resourceserver.jwt.jwk-set-uri`/`issuer-uri` had the same `#{null}` default, so OAuth2 resource server auto-config tried building a `NimbusJwtDecoder` from the literal string `"#{null}"` → `MalformedURLException`.
-4. That surfaced `TenantResolutionFilter` (a plain `Filter` bean, always included by `@WebMvcTest` slices) failing to construct — its `TenantService`/`TenantSessionConfigurer` deps aren't available in a slice context. Fixed centrally by mocking both in `TestSecurityConfig`.
-5. That surfaced a **real production bug**: `GlobalExceptionHandler` had no handler for `AccessDeniedException`/`AuthorizationDeniedException`, so every `@PreAuthorize` denial fell through to the catch-all and returned 500 instead of 403 — for every role-protected endpoint in the app, not just appointments. Caught by this PR's own new 403 test cases, the first in the suite to exercise this path end-to-end.
-
-Result: `./gradlew test` failures went from 42 → 15 (confirmed on CI run https://github.com/ductringuyen-0618/salon-hub/actions/runs/37144617943, head `0a61def3`). All appointment/tenant/auth-related tests, including this PR's own, are green. The remaining 15 are two unrelated, pre-existing failures that don't touch any file this PR changes:
-- `SimpleAuthTest` + `SecuritySystemTest` (7 tests) — share one Spring context cache key; the real failure is `SimpleAuthTest`'s `StaleObjectStateException` merging `Tenant#1`, a seed-data/tenant-bootstrap mismatch when that test's `@TestPropertySource` disables Flyway.
-- `QueueServiceImplTest` + `CheckInServiceTest` (8 tests) — plain Mockito unit tests whose mocks/expectations have drifted from `QueueServiceImpl`/`CheckInService`'s current behavior (e.g. `WaitTimeEstimator` never mocked) — unrelated Queue/Check-In business-logic drift.
-
-Could not verify `./gradlew integrationTest` locally (no Docker daemon in the sandbox); it compiles cleanly and ran for real on the CI runner. `./gradlew bootJar` succeeds locally.
-
-Standing down on the remaining 15 (comment https://github.com/ductringuyen-0618/salon-hub/pull/7#issuecomment-5972235349) rather than spending a third attempt on them — fixing them means understanding the tenant-seeding bootstrap path and the Queue/Check-In business logic, which is genuinely out of scope for "Admin Bookings." This proposal stays `in_progress`, not `shipped`, until `build-test` is fully green.
