@@ -43,6 +43,9 @@ class QueueServiceImplTest {
     @Mock
     private QueueNotificationService notificationService;
 
+    @Mock
+    private WaitTimeEstimator waitTimeEstimator;
+
     @InjectMocks
     private QueueServiceImpl queueService;
 
@@ -137,7 +140,7 @@ class QueueServiceImplTest {
         // Given
         given(queueRepository.findById(1L)).willReturn(Optional.of(queue));
         given(queueRepository.save(any(Queue.class))).willReturn(queue);
-        given(queueRepository.findByStatusOrderByCreatedAtAsc(QueueStatus.WAITING)).willReturn(List.of());
+        given(waitTimeEstimator.recalculateWaitingQueue()).willReturn(List.of());
         given(customerRepository.findById(queue.getCustomerId())).willReturn(Optional.of(CustomerDatabaseDefault.JANE));
         given(employeeRepository.findById(queue.getEmployeeId())).willReturn(Optional.of(EmployeeDatabaseDefault.ALICE));
 
@@ -163,7 +166,7 @@ class QueueServiceImplTest {
     @Test
     void removeFromQueue_shouldDeleteEntry() {
         // Given
-        given(queueRepository.findByStatusOrderByCreatedAtAsc(QueueStatus.WAITING)).willReturn(List.of());
+        given(waitTimeEstimator.recalculateWaitingQueue()).willReturn(List.of());
 
         // When
         queueService.removeFromQueue(1L);
@@ -177,7 +180,7 @@ class QueueServiceImplTest {
         // Given
         given(queueRepository.findById(1L)).willReturn(Optional.of(queue));
         given(queueRepository.save(any(Queue.class))).willReturn(queue);
-        given(queueRepository.findByStatusOrderByCreatedAtAsc(QueueStatus.WAITING)).willReturn(List.of());
+        given(waitTimeEstimator.recalculateWaitingQueue()).willReturn(List.of());
         given(customerRepository.findById(queue.getCustomerId())).willReturn(Optional.of(CustomerDatabaseDefault.JANE));
         given(employeeRepository.findById(queue.getEmployeeId())).willReturn(Optional.of(EmployeeDatabaseDefault.ALICE));
 
@@ -191,46 +194,33 @@ class QueueServiceImplTest {
     }
 
     @Test
-    void calculateEstimatedWaitTime_shouldReturnBaseTime_whenNoWaitingCustomers() {
-        // Given
-        given(queueRepository.findByStatusOrderByCreatedAtAsc(QueueStatus.WAITING)).willReturn(List.of());
+    void calculateEstimatedWaitTime_shouldDelegateToWaitTimeEstimator() {
+        // Given: the position*30min formula was replaced by WaitTimeEstimator's
+        // parallel-tech simulation (see WaitTimeEstimatorTest for its own
+        // coverage) - this service method is now a pure delegation.
+        given(waitTimeEstimator.estimateForNewArrival()).willReturn(42);
 
         // When
         Integer result = queueService.calculateEstimatedWaitTime();
 
         // Then
-        assertThat(result).isEqualTo(15);
+        assertThat(result).isEqualTo(42);
     }
 
     @Test
-    void calculateEstimatedWaitTime_shouldCalculateBasedOnQueueSize() {
-        // Given
-        List<Queue> waitingCustomers = List.of(queue, queue);
-        given(queueRepository.findByStatusOrderByCreatedAtAsc(QueueStatus.WAITING)).willReturn(waitingCustomers);
-
-        // When
-        Integer result = queueService.calculateEstimatedWaitTime();
-
-        // Then
-        assertThat(result).isEqualTo(60); // 30 minutes per customer * 2 customers
-    }
-
-    @Test
-    void updateQueuePositions_shouldUpdateAllWaitingCustomers() {
-        // Given
-        Queue queue1 = QueueTestDataBuilder.aQueueEntry().withId(1L).build();
-        Queue queue2 = QueueTestDataBuilder.aQueueEntry().withId(2L).build();
-        List<Queue> waitingCustomers = List.of(queue1, queue2);
-        given(queueRepository.findByStatusOrderByCreatedAtAsc(QueueStatus.WAITING)).willReturn(waitingCustomers);
+    void updateQueuePositions_shouldSaveEveryEntryReturnedByTheEstimator() {
+        // Given: WaitTimeEstimator.recalculateWaitingQueue() computes and sets
+        // position/estimatedWaitTime on each entry; the service just persists
+        // what it returns (see WaitTimeEstimatorTest for the computation itself).
+        Queue queue1 = QueueTestDataBuilder.aQueueEntry().withId(1L).withPosition(1).withEstimatedWaitTime(30).build();
+        Queue queue2 = QueueTestDataBuilder.aQueueEntry().withId(2L).withPosition(2).withEstimatedWaitTime(60).build();
+        given(waitTimeEstimator.recalculateWaitingQueue()).willReturn(List.of(queue1, queue2));
 
         // When
         queueService.updateQueuePositions();
 
         // Then
-        assertThat(queue1.getPosition()).isEqualTo(1);
-        assertThat(queue1.getEstimatedWaitTime()).isEqualTo(30);
-        assertThat(queue2.getPosition()).isEqualTo(2);
-        assertThat(queue2.getEstimatedWaitTime()).isEqualTo(60);
-        verify(queueRepository, times(2)).save(any(Queue.class));
+        verify(queueRepository).save(queue1);
+        verify(queueRepository).save(queue2);
     }
 }
