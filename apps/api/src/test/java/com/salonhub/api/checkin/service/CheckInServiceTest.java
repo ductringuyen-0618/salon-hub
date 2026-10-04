@@ -61,10 +61,9 @@ class CheckInServiceTest {
 
     @Test
     void testCheckInGuest_Success() {
-        // Arrange
-        when(customerRepository.findByPhoneOrEmail(anyString(), anyString()))
-            .thenReturn(Optional.empty());
-        
+        // Arrange: a phone-only guest contact never triggers a duplicate
+        // lookup (only a duplicate *email* does, to drop it to null for
+        // party members sharing one address - see CheckInService.createGuestCustomer).
         Customer savedGuest = new Customer();
         savedGuest.setId(2L);
         savedGuest.setName("Jane Guest");
@@ -94,8 +93,8 @@ class CheckInServiceTest {
         assertEquals(1, response.getQueuePosition());
         assertEquals(15, response.getEstimatedWaitTime());
         assertEquals(1L, response.getQueueId());
-        
-        verify(customerRepository).findByPhoneOrEmail("555-5678", "555-5678");
+
+        verify(customerRepository, never()).findByPhoneOrEmail(anyString(), anyString());
         verify(customerRepository).save(any(Customer.class));
         verify(queueService).addToQueue(any(Queue.class));
     }
@@ -134,22 +133,37 @@ class CheckInServiceTest {
     }
 
     @Test
-    void testCheckInGuest_PhoneNumberAlreadyExists() {
-        // Arrange
-        when(customerRepository.findByPhoneOrEmail(anyString(), anyString()))
-            .thenReturn(Optional.of(existingCustomer));
+    void testCheckInGuest_DuplicatePhoneNumber_StillSucceeds() {
+        // A phone number is not unique on Customer - walk-in parties (a
+        // parent + kids, a couple, friends) often share one phone, and each
+        // member gets their own guest Customer row + queue entry. Guest
+        // check-in must not reject a phone it has already seen.
+        Customer secondGuest = new Customer();
+        secondGuest.setId(3L);
+        secondGuest.setName("Jane Guest");
+        secondGuest.setPhoneNumber("555-5678");
+        secondGuest.setGuest(true);
+        secondGuest.setCreatedAt(LocalDateTime.now());
+        when(customerRepository.save(any(Customer.class))).thenReturn(secondGuest);
 
-        // Act & Assert
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> checkInService.checkIn(guestRequest)
-        );
-        
-        assertEquals("A customer with this contact information already exists. Use existing customer check-in instead.", 
-                    exception.getMessage());
-        
-        verify(customerRepository).findByPhoneOrEmail("555-5678", "555-5678");
-        verify(customerRepository, never()).save(any(Customer.class));
+        Queue mockQueue = new Queue(3L, "Guest check-in");
+        mockQueue.setId(4L);
+        mockQueue.setPosition(2);
+        mockQueue.setEstimatedWaitTime(30);
+        mockQueue.setCreatedAt(LocalDateTime.now());
+        when(queueService.addToQueue(any(Queue.class))).thenReturn(mockQueue);
+
+        // Act
+        CheckInResponseDTO response = checkInService.checkIn(guestRequest);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals("Jane Guest", response.getName());
+        assertTrue(response.isGuest());
+
+        verify(customerRepository, never()).findByPhoneOrEmail(anyString(), anyString());
+        verify(customerRepository).save(any(Customer.class));
+        verify(queueService).addToQueue(any(Queue.class));
     }
 
     @Test
