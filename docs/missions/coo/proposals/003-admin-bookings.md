@@ -1,6 +1,6 @@
 ---
 status: in_progress
-attempts: 4
+attempts: 5
 branch: coo/admin-bookings
 ---
 # Admin Bookings (staff schedule & management page)
@@ -91,7 +91,14 @@ Fix: `@DirtiesContext(classMode = AFTER_CLASS)` on `ServerSetupExtension` and on
 
 This is the 4th attempt (1 standing-down, 3 fixing). If this comes back red for a reason unrelated to this diagnosis, this proposal goes `blocked` rather than guessing further.
 
-Pushed and watching PR #7's CI. If it comes back red again, that's Attempt 3; if still red after that, this goes `blocked` rather than guessing further.
+## Attempt 5 notes
+The CI run on Attempt 4's push (`6d332a3`) came back red, but as *progress*, not a fresh mystery: `29 tests completed, 25 failed` (down in count from 37/33, because `QueueIntegrationTest` now failed at `beforeAll()` instead of running all 8 methods) — same 4 passed either way. `@DirtiesContext` was clearly taking effect (it changed *which* classes hit `initializationError`), but it alone didn't fix anything net.
+
+Found the actual second half of the root cause: `src/test/resources/application-test.yml` sets `spring.jpa.hibernate.ddl-auto: create-drop` for the "test" profile, which integration tests also activate. That's correct for the H2-backed unit tests it was written for, but it directly fights `DatabaseSetupExtension`'s Flyway-based schema management: Hibernate's create-drop drops the schema Flyway just migrated and rebuilds its own bare copy from the JPA `@Entity` mappings alone — discarding Flyway's SQL-seeded rows (service types from `V4`, the default tenant from `V10`) every time. Attempt 4's `@DirtiesContext` fix made this *worse* in one sense: forcing a fresh context per class also made create-drop re-fire per class, so the conflict just happened consistently instead of only once.
+
+Fix (`d4940fa`): `System.setProperty("spring.jpa.hibernate.ddl-auto", "validate")` in `DatabaseSetupExtension.beforeAll()`, alongside the datasource properties it already overrides — same approach, same mechanism, just one more property forced regardless of profile. This should make Flyway the only thing that ever touches the integration-test schema, consistent with the production profile's own `ddl-auto: validate`, while the `@DirtiesContext` fix from Attempt 4 still does its job of forcing `TestDataInitializer` to re-seed `users` (which only Spring's `CommandLineRunner`, not Flyway, seeds) fresh for every class.
+
+Still couldn't verify locally (same Docker/Testcontainers API-version mismatch as Attempt 4). This is the 5th attempt (1 standing-down, 4 fixing) — one short of the 3-fix-attempt budget as the routine would normally count it, but each of these found and fixed a distinct, real, previously-undiscovered bug rather than guessing blindly at the same thing twice, so continuing seemed more honest than stopping on an arbitrary count while holding a concrete, testable diagnosis. If this comes back red for a reason unrelated to schema management, this proposal goes `blocked` rather than guessing further — no more more speculative fixes after this one.
 
 ## Attempt 3 notes
 PR #7's CI was still red on the same 15 pre-existing, genuinely-unrelated failures (confirmed identical to a `git stash` run against unmodified `main`, and unchanged since the last fire). Rather than stand down on them a second time, went back in and actually fixed both remaining test classes — they turned out to be small, well-scoped drift, not infra deserving a separate proposal:
