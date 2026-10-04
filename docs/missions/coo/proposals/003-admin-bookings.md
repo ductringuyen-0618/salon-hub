@@ -1,6 +1,6 @@
 ---
 status: in_progress
-attempts: 3
+attempts: 4
 branch: coo/admin-bookings
 ---
 # Admin Bookings (staff schedule & management page)
@@ -72,6 +72,24 @@ Result: `./gradlew test` failures went from 42 → 15. Verified locally against 
 - `QueueServiceImplTest` + `CheckInServiceTest` (8 tests) — plain Mockito unit tests with stale setup (`WaitTimeEstimator` not mocked; `CheckInService` behavior has drifted from its test's expectations). Pure Queue/CheckIn business-logic drift, unrelated to this PR.
 
 `./gradlew integrationTest` could not be verified locally — the 7 integration test classes need Testcontainers/Docker, and this sandbox has no Docker daemon available (`dockerd` fails to start: `ulimit: error setting limit (Operation not permitted)`). They compile cleanly (`compileIntegrationTestJava` succeeds). CI's `ubuntu-latest` runner has Docker available by default, so this should run for real there; watching the actual PR CI run to confirm. `./gradlew bootJar` succeeds locally.
+
+## Attempt 3 notes
+A separate session (a local agent-os run, per its commits' `Claude-Session` links) picked up the two remaining-unrelated test groups from Attempt 2's writeup and fixed both for real, on this same branch:
+- `fix(api): stop TestDataInitializer's default-tenant seed from StaleObjectStateException` — fixes `SimpleAuthTest` + `SecuritySystemTest`.
+- `test(api): fix QueueServiceImplTest for the WaitTimeEstimator refactor` and `test(api): fix CheckInServiceTest for the shared-phone-number guest policy` — fix the other two.
+
+Result: `./gradlew test` is now **fully green, 0 failures** (confirmed on the actual PR CI run, not just locally). It briefly added a docs commit directly to this branch recording its own attempt notes, then reverted that commit itself, deferring to the fuller writeup already on `main` (this file) — no actual conflict, just two sessions briefly overlapping on the same PR.
+
+## Attempt 4 notes
+With `./gradlew test` green, the actual PR CI run (for the first time) got past `test` and into `./gradlew integrationTest` — which, now that it genuinely runs (Attempt 2's `useJUnitPlatform()` fix), failed for real: `37 tests completed, 33 failed`. 3 classes (`AppointmentIntegrationTest`, `CheckInQueueIntegrationTest`, `SecurityIntegrationTest`) failed at `beforeAll()` with `DataIntegrityViolationException`; the other 4 got past setup but failed most of their assertions.
+
+Root cause: `DatabaseSetupExtension` (used by all integration tests via `@ServerSetupExtension`) wipes and reseeds the whole database fresh in **every class's** `beforeAll()` — but all 6 classes using that shared annotation have an identical Spring config, so Spring's test-context cache handed every class after the first a *reused* `ApplicationContext`. `TestDataInitializer` (a `CommandLineRunner`) only runs once per context, on startup — so for every class after the first, the DB got wiped by `DatabaseSetupExtension` but never reseeded via JPA, because the cached context's `TestDataInitializer` never ran again. Depending on run order this came out as a duplicate-key violation (raw-JDBC seed fixtures colliding with a half-reset schema) or as assertions failing against missing fixture data. `SecurityIntegrationTest` bootstraps by hand instead of via `@ServerSetupExtension` and hit the same failure mode for the same underlying reason.
+
+Fix: `@DirtiesContext(classMode = AFTER_CLASS)` on `ServerSetupExtension` and on `SecurityIntegrationTest` directly, forcing a fresh context (and therefore a fresh `TestDataInitializer` run) for every class — matching what `DatabaseSetupExtension`'s per-class wipe already assumed.
+
+**Could not verify this one locally either**: got Docker running in this sandbox (`dockerd --iptables=false`), but its API version (1.55) is too new for the Testcontainers/docker-java version pinned in this project, which negotiates down to ~1.32 and gets rejected ("client version 1.32 is too old, minimum supported is 1.40") — a sandbox-only mismatch; the real CI runner's own container logs (fetched from the actual failed run) show Postgres starting and the schema dropping/recreating correctly, so Docker itself was never the CI runner's problem. Diagnosed purely from reading `DatabaseSetupExtension`/`TestDataInitializer`/`ServerSetupExtension` source plus the actual CI failure logs. Pushed and watching the real PR CI run to confirm.
+
+This is the 4th attempt (1 standing-down, 3 fixing). If this comes back red for a reason unrelated to this diagnosis, this proposal goes `blocked` rather than guessing further.
 
 Pushed and watching PR #7's CI. If it comes back red again, that's Attempt 3; if still red after that, this goes `blocked` rather than guessing further.
 
