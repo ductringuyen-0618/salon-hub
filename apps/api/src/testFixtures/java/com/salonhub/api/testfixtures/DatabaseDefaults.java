@@ -17,6 +17,16 @@ public class DatabaseDefaults {
         // on tenant_id (added by V10) don't blow up. Existing test data
         // lives under tenant_id=1.
         ensureDefaultTenant(jdbc);
+        // By the time this runs, the Spring context backing this test class
+        // has just finished booting — which means TestDataInitializer (a
+        // CommandLineRunner) has already run too, and its seedEmployees()
+        // inserts its own dev/E2E roster (Lisa Chen, Maria Garcia, ...) via
+        // JPA auto-generated ids whenever the employees table is empty.
+        // That collides with (or silently pre-empts) EmployeeDatabaseDefault's
+        // fixed-id fixtures (ALICE_ID=1, BOB_ID=2) that these integration
+        // tests actually reference by id and name. Clear it first so our
+        // fixtures land deterministically.
+        jdbc.execute("DELETE FROM employees");
         CustomerDatabaseDefault.seed(jdbc);
         EmployeeDatabaseDefault.seed(jdbc);
         QueueDatabaseDefault.seed(jdbc);
