@@ -30,6 +30,24 @@ public class DatabaseDefaults {
         CustomerDatabaseDefault.seed(jdbc);
         EmployeeDatabaseDefault.seed(jdbc);
         QueueDatabaseDefault.seed(jdbc);
+        // customers/employees/queue (above) and tenants (in ensureDefaultTenant)
+        // were all seeded with explicit, hand-picked ids via raw SQL. Postgres
+        // doesn't advance a BIGSERIAL column's sequence for an explicit-value
+        // insert, so the next JPA-generated insert on any of these tables —
+        // e.g. a test's own POST /api/customers — would try to reuse an id
+        // that's already taken by these fixtures and fail with a constraint
+        // violation. Resync each sequence to the current max id so new rows
+        // get ids past the fixtures instead.
+        resyncIdSequence(jdbc, "customers");
+        resyncIdSequence(jdbc, "employees");
+        resyncIdSequence(jdbc, "queue");
+        resyncIdSequence(jdbc, "tenants");
+    }
+
+    private static void resyncIdSequence(JdbcTemplate jdbc, String table) {
+        jdbc.execute(String.format(
+            "SELECT setval(pg_get_serial_sequence('%s', 'id'), COALESCE((SELECT MAX(id) FROM %s), 1))",
+            table, table));
     }
 
     private static void ensureDefaultTenant(JdbcTemplate jdbc) {
