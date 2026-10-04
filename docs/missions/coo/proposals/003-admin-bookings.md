@@ -1,6 +1,6 @@
 ---
 status: in_progress
-attempts: 2
+attempts: 3
 branch: coo/admin-bookings
 ---
 # Admin Bookings (staff schedule & management page)
@@ -74,3 +74,14 @@ Result: `./gradlew test` failures went from 42 → 15. Verified locally against 
 `./gradlew integrationTest` could not be verified locally — the 7 integration test classes need Testcontainers/Docker, and this sandbox has no Docker daemon available (`dockerd` fails to start: `ulimit: error setting limit (Operation not permitted)`). They compile cleanly (`compileIntegrationTestJava` succeeds). CI's `ubuntu-latest` runner has Docker available by default, so this should run for real there; watching the actual PR CI run to confirm. `./gradlew bootJar` succeeds locally.
 
 Pushed and watching PR #7's CI. If it comes back red again, that's Attempt 3; if still red after that, this goes `blocked` rather than guessing further.
+
+## Attempt 3 notes
+PR #7's CI was still red on the same 15 pre-existing, genuinely-unrelated failures (confirmed identical to a `git stash` run against unmodified `main`, and unchanged since the last fire). Rather than stand down on them a second time, went back in and actually fixed both remaining test classes — they turned out to be small, well-scoped drift, not infra deserving a separate proposal:
+
+1. **`SimpleAuthTest` + `SecuritySystemTest` (7 tests)** — root cause wasn't tenant-seed *data*, it was a Spring Data JPA pitfall in `TestDataInitializer.seedDefaultTenant()`: it called `t.setId(TenantContext.DEFAULT_ID)` before `tenantRepository.save(t)`. `Tenant` has no `@Version` field, so Spring Data's `isNew()` heuristic falls back to `id == null`; since the id was manually set, `save()` routed through `merge()` (expects an UPDATE) instead of `persist()` (INSERT). On the freshly created, empty H2 test schema there's no row to update, so Hibernate raised `StaleObjectStateException` on every `@WebMvcTest`/`@SpringBootTest` boot. Fix: stop setting the id and let the `IDENTITY` column assign it — the tenants table is guaranteed empty at this point (same guarantee the Postgres `V10` migration relies on with its hard-coded `id=1`), so the first insert still comes out as `1`. `fix(api): stop TestDataInitializer's default-tenant seed from StaleObjectStateException`.
+2. **`QueueServiceImplTest` (6 of its failures)** — `QueueServiceImpl` was refactored at some point to delegate all wait-time math to a new `WaitTimeEstimator` collaborator (a parallel-tech scheduler simulation, with its own `WaitTimeEstimatorTest`), but this test class was never updated: it had no `@Mock WaitTimeEstimator`, so `@InjectMocks` left that field `null` and every method touching it NPE'd. Added the mock and rewrote the two tests that still asserted the old `position × 30 min` formula to instead verify the (now correct) delegation, leaving the actual wait-time computation to `WaitTimeEstimatorTest`. `test(api): fix QueueServiceImplTest for the WaitTimeEstimator refactor`.
+3. **`CheckInServiceTest` (2 of its failures)** — `CheckInService.createGuestCustomer()` already has a comment explaining it *intentionally* stopped rejecting a guest whose phone number matches an existing customer (walk-in parties sharing one phone — a parent + kids, a couple — each get their own guest row; only a duplicate *email* gets special handling, dropped to `null`). Two tests still pinned the old reject-on-duplicate-phone behavior: one expected an `IllegalArgumentException` that's no longer thrown (so it fell through to an unmocked `queueService.addToQueue` returning `null` and NPE'd on `.getCreatedAt()`), the other verified a `findByPhoneOrEmail` call a phone-only guest never makes. Rewrote both to match the documented, intentional behavior. `test(api): fix CheckInServiceTest for the shared-phone-number guest policy`.
+
+Verified locally (JDK 21, since this sandbox still has no JDK 17 — temporarily bumped `build.gradle`'s toolchain to 21 to run the suite, then reverted that before committing, so nothing JDK-version-related is actually committed): `./gradlew test` — **all 111 tests pass**, zero failures. `./gradlew bootJar` succeeds. `./gradlew compileIntegrationTestJava` succeeds; `integrationTest` itself still can't run here (no Docker daemon in this sandbox), same gap noted in every prior attempt — CI's `ubuntu-latest` runner has Docker, so watching the real PR run to confirm.
+
+Pushed 3 commits (`9a0e0c4`, `bef9ff5`, `e094fa6`) to `coo/admin-bookings`. Watching PR #7's actual CI now.
