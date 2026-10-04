@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: blocked
 attempts: 7
 branch: coo/admin-bookings
 ---
@@ -119,3 +119,16 @@ This is the same category of bug as Attempt 6, one layer further in: `customers`
 Fix (`8a5313d`): resync each table's id sequence to its current max id via Postgres's `pg_get_serial_sequence()`, right after seeding. New JPA-generated ids now start past the fixtures.
 
 This is attempt 7 (1 standing-down, 6 fixing) — well past where this would normally stop, but every one of these six fixes has addressed a distinct, confirmed bug visible in the actual CI log, not a guess, and each one has made genuine, measurable progress (42→15→0 unit failures; `initializationError` on 3-4 classes → `DuplicateKeyException` on the same → every class now reaching its test methods). If this next run is still red, but for a reason that isn't this same fixture/sequencing category, this stops here: `status: blocked`, write up exactly what's failing, and leave it for a human.
+
+## Blocked — why this stops here
+Attempt 7's push (`8a5313d`) did fix something real — `CustomerIntegrationTest`'s "create customer" test (the one whose exact failure I diagnosed and fixed) now passes, and the overall count ticked down (`57 completed, 51 failed`, from `52`). But every other test in `CustomerIntegrationTest`, `EmployeeIntegrationTest`, `QueueIntegrationTest`, and `ServiceTypeIntegrationTest` is still red, and this time it's not a sequencing bug — it's a genuine design conflict, confirmed by reading the test source directly:
+
+- `CustomerIntegrationTest.whenListCustomers_thenContainsCreated()` asserts `jsonPath("$[0].id").value(createdCustomerId)` — it expects the customer it just created via `POST /api/customers` to be the **first** (only) row `GET /api/customers` returns.
+- `EmployeeIntegrationTest.testListEmployees()` asserts `jsonPath("$[0].name").value("Alice Smith")` — same pattern, expecting its own freshly-created employee at index 0.
+- But `DatabaseDefaults.seedAll()` (wired into `DatabaseSetupExtension`, which every one of these classes uses via `@ServerSetupExtension`) unconditionally seeds 2 fixture customers (`Jane Doe` id=1, `John Smith` id=2) and 2 fixture employees (`Alice Stylist` id=1, `Bob Manager` id=2) into those same tables before any test method runs. So `$[0]` is always a fixture row, never the row the test itself created.
+
+These two designs cannot both be right at once: `AppointmentIntegrationTest` and `CheckInQueueIntegrationTest` are written to *need* the shared fixtures (they reference `CustomerDatabaseDefault.JANE_ID`/`EmployeeDatabaseDefault.ALICE_ID` directly), while `CustomerIntegrationTest`/`EmployeeIntegrationTest`/`QueueIntegrationTest`/`ServiceTypeIntegrationTest` are written to assume a pristine, empty table for isolated CRUD testing. Reconciling them means either rewriting the latter four classes' list-assertions to filter/search for their own created id instead of indexing `$[0]` (a real but non-trivial edit across 4 test files, changing test *behavior* and intent, not just config), or splitting fixture-seeding so some classes opt out — either way, a design decision about how this test suite should work, not a bounded bug fix.
+
+That's the line I set for myself three attempts ago: fix confirmed, bounded bugs; stop at a problem that needs a design decision instead of a patch. This is that problem. Status set to `blocked` — a human should decide whether to rewrite the four affected test classes' assertions, change the fixture-seeding strategy, or something else, before this goes further.
+
+**Where this leaves "Admin Bookings" itself**: the feature code (the actual `/admin/bookings` page and `GET /api/appointments` endpoint) has been fully built, unit-tested, and reviewed since the first fire on this proposal. `./gradlew test` is 100% green. The only thing blocking a ship is `./gradlew integrationTest`, which exercises **all 7** integration test classes in this repo, most of which predate this proposal and have nothing to do with appointments — this PR's own CI gate just happens to be the first time that whole suite has ever actually run (it silently ran 0 tests before Attempt 2's `useJUnitPlatform()` fix). None of the 6 fixes landed here touch `/admin/bookings`'s own code or tests.
