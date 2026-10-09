@@ -21,6 +21,7 @@ const WaitListPage = lazy(() => import("./pages/WaitListPage"));
 const AdminSectionPlaceholder = lazy(() => import("./pages/AdminSectionPlaceholder"));
 const AdminSettingsPage = lazy(() => import("./pages/AdminSettingsPage"));
 const AdminServicesPage = lazy(() => import("./pages/AdminServicesPage"));
+const AdminBookingsPage = lazy(() => import("./pages/AdminBookingsPage"));
 const SignupPage = lazy(() => import("./pages/SignupPage"));
 
 function App() {
@@ -81,7 +82,9 @@ function App() {
                 </ProtectedRoute>
               } />
               <Route path="/admin/bookings" element={
-                <ProtectedRoute requireAdmin={true}><Navigate to="/admin" replace /></ProtectedRoute>
+                <ProtectedRoute requireAdmin={true}>
+                  <AdminBookingsPage />
+                </ProtectedRoute>
               } />
               <Route path="/admin/analytics" element={
                 <ProtectedRoute requireAdmin={true}>
