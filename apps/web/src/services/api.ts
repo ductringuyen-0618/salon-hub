@@ -513,6 +513,18 @@ class ApiService {
     return this.request<Appointment>(`/appointments/${id}`);
   }
 
+  /**
+   * All appointments for the current tenant, optionally narrowed to a
+   * from/to date range (yyyy-MM-dd, inclusive). Omit both for everything.
+   */
+  async getAppointments(from?: string, to?: string): Promise<Appointment[]> {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    const query = params.toString();
+    return this.request<Appointment[]>(`/appointments${query ? `?${query}` : ''}`);
+  }
+
   async getAppointmentsByCustomer(customerId: number): Promise<Appointment[]> {
     return this.request<Appointment[]>(`/appointments/customer/${customerId}`);
   }
@@ -573,9 +585,8 @@ class ApiService {
   }
 
   async updateAppointmentStatus(id: number, status: Appointment['status']): Promise<Appointment> {
-    return this.request<Appointment>(`/appointments/${id}/status`, {
+    return this.request<Appointment>(`/appointments/${id}/status?status=${encodeURIComponent(status)}`, {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
     });
   }
 

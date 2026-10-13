@@ -6,6 +6,7 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -132,6 +133,25 @@ public class GlobalExceptionHandler {
         
         log.warn("State error: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    /**
+     * Handle @PreAuthorize / @PostAuthorize denials (and the newer
+     * AuthorizationDeniedException, which extends this). Without this
+     * handler they fall through to the catch-all below and come back as
+     * 500 instead of 403 — Spring Security never gets a chance to
+     * translate them since this @RestControllerAdvice intercepts first.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(
+            AccessDeniedException ex, WebRequest request) {
+
+        ErrorResponse response = ErrorResponse.forbidden(
+                "You do not have permission to perform this action.");
+        response.setPath(request.getDescription(false).replace("uri=", ""));
+
+        log.warn("Access denied: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
     /**
