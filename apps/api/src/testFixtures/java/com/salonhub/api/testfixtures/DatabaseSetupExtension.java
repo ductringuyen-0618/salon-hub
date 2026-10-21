@@ -29,6 +29,14 @@ public class DatabaseSetupExtension implements BeforeAllCallback, AfterAllCallba
         System.setProperty("spring.datasource.username", POSTGRES_CONTAINER.getUsername());
         System.setProperty("spring.datasource.password", POSTGRES_CONTAINER.getPassword());
         System.setProperty("spring.datasource.driver-class-name", POSTGRES_CONTAINER.getDriverClassName());
+        // src/test/resources/application-test.yml sets ddl-auto: create-drop for
+        // the "test" profile these integration tests also activate — fine for
+        // H2-backed unit tests, but it fights the Flyway clean()+migrate() below:
+        // Hibernate would drop the just-migrated schema (losing Flyway's SQL-seeded
+        // rows, e.g. service types) and recreate its own bare copy from the JPA
+        // mappings alone. Force "validate" so Flyway stays the only thing that
+        // touches the schema here, same as the production profile.
+        System.setProperty("spring.jpa.hibernate.ddl-auto", "validate");
 
         // Now run Flyway clean + migrate
         Flyway flyway = Flyway.configure()

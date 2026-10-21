@@ -18,10 +18,12 @@ import org.springframework.security.test.context.support.WithMockUser;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -74,6 +76,35 @@ class AppointmentControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(invalidRequest)))
             .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    @WithMockUser(roles = "MANAGER")
+    void whenGetAllAsManager_thenReturns200() throws Exception {
+        when(service.listAll(isNull(), isNull())).thenReturn(List.of(new AppointmentResponseDTO()));
+
+        mockMvc.perform(get("/api/appointments"))
+            .andExpect(status().isOk());
+
+        verify(service).listAll(isNull(), isNull());
+    }
+
+    @Test
+    @WithMockUser(roles = "TECHNICIAN")
+    void whenGetAllAsTechnician_thenReturns403() throws Exception {
+        mockMvc.perform(get("/api/appointments"))
+            .andExpect(status().isForbidden());
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void whenGetAllAsCustomer_thenReturns403() throws Exception {
+        mockMvc.perform(get("/api/appointments"))
+            .andExpect(status().isForbidden());
 
         verifyNoInteractions(service);
     }
