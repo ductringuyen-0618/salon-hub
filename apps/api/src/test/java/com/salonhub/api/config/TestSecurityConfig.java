@@ -1,6 +1,10 @@
 package com.salonhub.api.config;
 
 import com.salonhub.api.auth.service.JwtService;
+import com.salonhub.api.tenant.TenantContext;
+import com.salonhub.api.tenant.TenantSessionConfigurer;
+import com.salonhub.api.tenant.model.Tenant;
+import com.salonhub.api.tenant.service.TenantService;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -17,17 +21,39 @@ import org.mockito.Mockito;
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)  // Enable @PreAuthorize annotations
 public class TestSecurityConfig {
-    
+
     @Bean
     @Primary
     public JwtService jwtService() {
         return Mockito.mock(JwtService.class);
     }
-    
+
     @Bean
     @Primary
     public UserDetailsService userDetailsService() {
         return Mockito.mock(UserDetailsService.class);
+    }
+
+    /**
+     * TenantResolutionFilter is a plain Filter bean, which @WebMvcTest
+     * slices always include even though they exclude @Service/@Component
+     * beans from other layers — so its constructor deps need a stand-in
+     * here or every controller slice test fails to load its context.
+     */
+    @Bean
+    @Primary
+    public TenantService tenantService() {
+        TenantService mock = Mockito.mock(TenantService.class);
+        Tenant defaultTenant = new Tenant(TenantContext.DEFAULT_SLUG, "Default");
+        defaultTenant.setId(TenantContext.DEFAULT_ID);
+        Mockito.when(mock.getDefault()).thenReturn(defaultTenant);
+        return mock;
+    }
+
+    @Bean
+    @Primary
+    public TenantSessionConfigurer tenantSessionConfigurer() {
+        return Mockito.mock(TenantSessionConfigurer.class);
     }
 
     @Bean

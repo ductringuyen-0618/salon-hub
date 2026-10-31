@@ -118,4 +118,21 @@ public class AppointmentIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("CANCELLED"));
     }
+
+    @Test
+    @Order(7)
+    void getAll_shouldIncludeAppointment() throws Exception {
+        mockMvc.perform(get("/api/appointments"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.id == " + appointmentId + ")]").exists());
+    }
+
+    @Test
+    @Order(8)
+    void getAll_withFromToOutsideRange_shouldExcludeAppointment() throws Exception {
+        String farFuture = LocalDateTime.now().plusYears(10).toLocalDate().toString();
+        mockMvc.perform(get("/api/appointments").param("from", farFuture))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.id == " + appointmentId + ")]").doesNotExist());
+    }
 }
