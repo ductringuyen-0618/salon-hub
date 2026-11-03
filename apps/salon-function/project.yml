@@ -1,0 +1,15 @@
+parameters: {}
+environment:
+  POS_BASE_URL: ${POS_BASE_URL}
+  POS_PARTNER_KEY_ID: ${POS_PARTNER_KEY_ID}
+  POS_PARTNER_SECRET: ${POS_PARTNER_SECRET}
+  ALLOWED_ORIGIN: ${ALLOWED_ORIGIN}
+packages:
+  - name: salon
+    functions:
+      - name: get
+        runtime: nodejs:22
+        web: true
+        limits:
+          timeout: 10000
+          memory: 128

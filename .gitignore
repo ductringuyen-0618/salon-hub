@@ -1,42 +1,21 @@
-# ---- Root ----
 node_modules/
 .DS_Store
 *.log
 
-# ---- IDE / editors ----
 .idea/
 .vscode/
 *.iml
 *.swp
 
-# ---- Env files (apps keep their own .env.example committed) ----
+# Env files. Only .env.example files are committed.
 .env
 .env.local
 .env.*.local
+.env.hub-e2e
 
-# ---- Secret scratch files ----
-.NEW_JWT_SECRET.txt
 *.pem
 *.key
 
-# ---- Local runtime logs (api/web bootRun dumps) ----
-.api-boot.log
-.api-boot.log.err
-.web-boot.log
-.web-boot.log.err
-
-# ---- apps/api (Spring Boot / Gradle) ----
-apps/api/build/
-apps/api/bin/
-apps/api/.gradle/
-apps/api/out/
-apps/api/target/
-apps/api/*.class
-
-# ---- apps/web (Vite / Node) ----
-apps/web/node_modules/
 apps/web/dist/
-apps/web/.vite/
 apps/web/coverage/
-apps/web/.vercel/
-apps/web/.next/
+apps/salon-function/packages/salon/get/index.js

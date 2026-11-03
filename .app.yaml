@@ -1,0 +1,41 @@
+name: salon-hub
+region: nyc
+static_sites:
+  - name: web
+    github:
+      repo: OWNER/salon-hub
+      branch: main
+      deploy_on_push: true
+    source_dir: /
+    build_command: npm ci && npm run build --workspace apps/web
+    output_dir: apps/web/dist
+    catch_all_document: index.html
+    envs:
+      - key: VITE_SALON_URL
+        scope: BUILD_TIME
+        value: REPLACE_WITH_FUNCTION_URL
+      - key: VITE_BOOKING_URL
+        scope: BUILD_TIME
+        value: REPLACE_WITH_POS_BOOKING_URL
+functions:
+  - name: salon-function
+    github:
+      repo: OWNER/salon-hub
+      branch: main
+      deploy_on_push: true
+    source_dir: apps/salon-function
+    envs:
+      - key: POS_BASE_URL
+        scope: RUN_TIME
+        value: REPLACE_WITH_POS_URL
+      - key: POS_PARTNER_KEY_ID
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_IN_DASHBOARD
+      - key: POS_PARTNER_SECRET
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_IN_DASHBOARD
+      - key: ALLOWED_ORIGIN
+        scope: RUN_TIME
+        value: REPLACE_WITH_SITE_ORIGIN
