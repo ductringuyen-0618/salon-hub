@@ -124,6 +124,13 @@ describe("the home page", () => {
     expect(screen.queryByText(/To book, call/)).toBeNull();
   });
 
+  it("opens the booking page in the same tab", async () => {
+    vi.stubGlobal("fetch", reply(salon));
+    render(<App {...props} />);
+    const link = await screen.findByRole("link", { name: "Book now" });
+    expect(link).not.toHaveAttribute("target");
+  });
+
   it("hides Book now and shows a call line when online booking is off", async () => {
     vi.stubGlobal("fetch", reply({ ...salon, onlineBookingEnabled: false }));
     render(<App {...props} />);
