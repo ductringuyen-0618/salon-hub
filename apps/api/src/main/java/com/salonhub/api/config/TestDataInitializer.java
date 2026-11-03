@@ -60,10 +60,16 @@ public class TestDataInitializer implements CommandLineRunner {
 
     private void seedDefaultTenant() {
         if (tenantRepository.findById(TenantContext.DEFAULT_ID).isPresent()) return;
+        // Let the IDENTITY column assign the id (this only runs against the
+        // freshly created, empty H2 schema, so it comes out as 1 - same as
+        // the DEFAULT_ID the Postgres V10 migration hard-codes). Manually
+        // calling setId() here made Spring Data treat this as an update of
+        // an existing row (no @Version, non-null id => isNew() == false),
+        // which failed with StaleObjectStateException since no such row
+        // exists yet.
         Tenant t = new Tenant("default", "Default Salon");
-        t.setId(TenantContext.DEFAULT_ID);
         tenantRepository.save(t);
-        log.info("Seeded default tenant (id={}, slug=default)", TenantContext.DEFAULT_ID);
+        log.info("Seeded default tenant (id={}, slug=default)", t.getId());
     }
 
     private void seedEmployees() {

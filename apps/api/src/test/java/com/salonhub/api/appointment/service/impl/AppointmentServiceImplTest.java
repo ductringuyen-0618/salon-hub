@@ -23,13 +23,16 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -129,6 +132,41 @@ class AppointmentServiceImplTest {
         List<AppointmentResponseDTO> list = service.listByCustomer(1L);
         assertEquals(1, list.size());
         assertEquals(99L, list.get(0).getId());
+    }
+
+    @Test
+    void listAll_noRange_returnsEverythingFromMinToMax() {
+        when(repo.findByStartTimeBetween(eq(LocalDateTime.MIN), eq(LocalDateTime.MAX)))
+            .thenReturn(List.of(savedEntity));
+        when(mapper.toResponse(savedEntity)).thenReturn(responseDTO);
+
+        List<AppointmentResponseDTO> result = service.listAll(null, null);
+
+        assertEquals(1, result.size());
+        assertEquals(99L, result.get(0).getId());
+    }
+
+    @Test
+    void listAll_withRange_narrowsToStartOfDayBounds() {
+        LocalDate from = LocalDate.of(2025, 5, 1);
+        LocalDate to = LocalDate.of(2025, 5, 3);
+        when(repo.findByStartTimeBetween(eq(from.atStartOfDay()), eq(to.plusDays(1).atStartOfDay())))
+            .thenReturn(List.of(savedEntity));
+        when(mapper.toResponse(savedEntity)).thenReturn(responseDTO);
+
+        List<AppointmentResponseDTO> result = service.listAll(from, to);
+
+        assertEquals(1, result.size());
+        verify(repo).findByStartTimeBetween(from.atStartOfDay(), to.plusDays(1).atStartOfDay());
+    }
+
+    @Test
+    void listAll_empty_returnsEmptyList() {
+        when(repo.findByStartTimeBetween(any(), any())).thenReturn(Collections.emptyList());
+
+        List<AppointmentResponseDTO> result = service.listAll(null, null);
+
+        assertTrue(result.isEmpty());
     }
 
     @Test

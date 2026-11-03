@@ -19,6 +19,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -97,6 +98,15 @@ public class AppointmentServiceImpl implements AppointmentService {
         ).stream()
          .map(this::enrich)
          .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<AppointmentResponseDTO> listAll(LocalDate from, LocalDate to) {
+        LocalDateTime start = from == null ? LocalDateTime.MIN : from.atStartOfDay();
+        LocalDateTime end = to == null ? LocalDateTime.MAX : to.plusDays(1).atStartOfDay();
+        return repo.findByStartTimeBetween(start, end).stream()
+            .map(this::enrich)
+            .collect(Collectors.toList());
     }
 
     @Override
