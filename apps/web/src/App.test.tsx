@@ -139,6 +139,14 @@ describe("the home page", () => {
     expect(screen.queryByRole("link", { name: "Book now" })).toBeNull();
   });
 
+  it("hides phone, address and map links when the POS has none", async () => {
+    vi.stubGlobal("fetch", reply({ ...salon, phone: "", address: "", onlineBookingEnabled: false }));
+    render(<App {...props} />);
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.getByText("Contact details are not listed yet.")).toBeInTheDocument();
+  });
+
   it("says so when no services are listed", async () => {
     vi.stubGlobal("fetch", reply({ ...salon, services: [] }));
     render(<App {...props} />);

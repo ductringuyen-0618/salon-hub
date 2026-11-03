@@ -19,6 +19,8 @@ export function Home({ salon, bookingUrl, now }: HomeProps) {
   const week = weekFromMonday(salon.hours);
   const todayHours = salon.hours.find((h) => h.day === today);
   const canBook = salon.onlineBookingEnabled && Boolean(bookingUrl);
+  const phone = salon.phone.trim();
+  const address = salon.address.trim();
   const groups = groupByCategory(salon.services);
 
   return (
@@ -26,9 +28,11 @@ export function Home({ salon, bookingUrl, now }: HomeProps) {
       <header className="border-b border-line bg-white">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
           <Logo name={salon.name} />
-          <a href={telHref(salon.phone)} className="font-medium text-brand hover:text-brand-hover">
-            {salon.phone}
-          </a>
+          {phone ? (
+            <a href={telHref(phone)} className="font-medium text-brand hover:text-brand-hover">
+              {phone}
+            </a>
+          ) : null}
         </div>
       </header>
 
@@ -47,14 +51,14 @@ export function Home({ salon, bookingUrl, now }: HomeProps) {
               <a href={bookingUrl} className="inline-block rounded-lg bg-brand px-6 py-3 text-lg font-semibold text-white hover:bg-brand-hover">
                 Book now
               </a>
-            ) : (
+            ) : phone ? (
               <p className="text-lg">
                 To book, call{" "}
-                <a href={telHref(salon.phone)} className="font-semibold text-brand underline">
-                  {salon.phone}
+                <a href={telHref(phone)} className="font-semibold text-brand underline">
+                  {phone}
                 </a>
               </p>
-            )}
+            ) : null}
           </div>
         </section>
 
@@ -63,15 +67,22 @@ export function Home({ salon, bookingUrl, now }: HomeProps) {
             <h2 id="visit" className="text-xl font-semibold">
               Visit
             </h2>
-            <p className="mt-3 break-words">{salon.address}</p>
-            <a href={mapHref(salon.address)} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block font-medium text-brand hover:text-brand-hover">
-              View on map
-            </a>
-            <p className="mt-4">
-              <a href={telHref(salon.phone)} className="font-medium text-brand hover:text-brand-hover">
-                Call {salon.phone}
-              </a>
-            </p>
+            {address ? (
+              <>
+                <p className="mt-3 break-words">{address}</p>
+                <a href={mapHref(address)} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block font-medium text-brand hover:text-brand-hover">
+                  View on map
+                </a>
+              </>
+            ) : null}
+            {phone ? (
+              <p className="mt-4">
+                <a href={telHref(phone)} className="font-medium text-brand hover:text-brand-hover">
+                  Call {phone}
+                </a>
+              </p>
+            ) : null}
+            {!address && !phone ? <p className="mt-3 text-ink-soft">Contact details are not listed yet.</p> : null}
           </section>
 
           <section aria-labelledby="hours" className="rounded-xl border border-line bg-white p-6">
@@ -96,7 +107,7 @@ export function Home({ salon, bookingUrl, now }: HomeProps) {
           {groups.length === 0 ? <p className="mt-3 text-ink-soft">No services are listed yet.</p> : null}
           {groups.map((g) => (
             <div key={g.category} className="mt-6">
-              <h3 className="text-lg font-semibold text-brand-dark">{g.category}</h3>
+              <h3 className="text-lg font-semibold capitalize text-brand-dark">{g.category}</h3>
               <ul className="mt-2 divide-y divide-line rounded-xl border border-line bg-white">
                 {g.items.map((s) => (
                   <li key={s.serviceRef} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3">
