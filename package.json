@@ -2,23 +2,13 @@
   "name": "salon-hub",
   "version": "0.0.0",
   "private": true,
-  "description": "Monorepo for salon-hub backend (apps/api) and frontend (apps/web).",
+  "description": "Static salon site (apps/web) and one signing function (apps/salon-function).",
+  "workspaces": ["apps/web", "apps/salon-function"],
   "scripts": {
-    "dev": "concurrently -n api,web -c blue,green \"npm:api:dev\" \"npm:web:dev\"",
-    "build": "npm run api:build && npm run web:build",
-    "test": "npm run api:test && npm run web:test",
-    "ci": "npm run web:install && npm test && npm run build",
-    "api:dev": "cd apps/api && gradlew bootRun",
-    "api:build": "cd apps/api && gradlew bootJar",
-    "api:test": "cd apps/api && gradlew test",
-    "api:integration-test": "cd apps/api && gradlew integrationTest",
-    "web:install": "cd apps/web && npm install",
-    "web:dev": "cd apps/web && npm run dev",
-    "web:build": "cd apps/web && npm run build",
-    "web:test": "cd apps/web && npm run test:ci",
-    "web:lint": "cd apps/web && npm run lint"
-  },
-  "devDependencies": {
-    "concurrently": "^9.0.0"
+    "dev": "npm run dev --workspace apps/web",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "ci": "npm run lint && npm run test && npm run build"
   }
 }
