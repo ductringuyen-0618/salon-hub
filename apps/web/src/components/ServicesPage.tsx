@@ -25,8 +25,8 @@ export function ServicesPage({ salon, bookingUrl, now, copy = defaultCopy }: Ser
 
   return (
     <div className="min-h-screen bg-paper">
-      <SiteHeader name={salon.name} tagline={copy.tagline} active="services" />
-      <main className="px-4 py-20">
+      <SiteHeader name={salon.name} tagline={copy.tagline} active="services" bookingUrl={canBook ? bookingUrl : undefined} />
+      <main id="main" tabIndex={-1} className="px-4 py-20 outline-none">
         <div className="mx-auto max-w-6xl">
           <div className="mb-16 text-center">
             <h1 className="mb-4 text-4xl font-light text-ink md:text-5xl">Our Services</h1>

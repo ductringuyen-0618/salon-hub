@@ -7,7 +7,7 @@ export const btnPrimary =
 export const btnOutline =
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full border-2 border-line px-10 py-4 text-lg font-medium text-ink transition-all duration-300 hover:border-brand hover:text-brand";
 export const btnSmall =
-  "inline-flex items-center justify-center whitespace-nowrap rounded-full bg-brand px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-brand-hover";
+  "inline-flex items-center justify-center min-h-[44px] whitespace-nowrap rounded-full bg-brand px-5 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-brand-hover";
 
 export function Card({ className = "", ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={`rounded-xl border border-line bg-surface shadow-sm transition-shadow duration-300 ${className}`} {...props} />;

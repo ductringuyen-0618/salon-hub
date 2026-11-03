@@ -120,7 +120,7 @@ describe("the home page", () => {
     expect(screen.queryByText(/2,500|4\.9|Licensed|Hospital/i)).toBeNull();
   });
 
-  it("shows featured services with price, time and Book Now", async () => {
+  it("shows featured services with price, time and Book now", async () => {
     vi.stubGlobal("fetch", reply(salon));
     render(<App {...props} />);
     await heading();
@@ -128,7 +128,7 @@ describe("the home page", () => {
     expect(within(popular).getByText("Manicure").closest("div.rounded-xl")).toHaveTextContent("$25");
     expect(within(popular).getByText("Pedicure").closest("div.rounded-xl")).toHaveTextContent("1 hr 15 min");
     expect(within(popular).queryByText("Gel polish")).toBeNull();
-    expect(within(popular).getAllByRole("link", { name: /^Book Now/ })).toHaveLength(2);
+    expect(within(popular).getAllByRole("link", { name: /^Book now: / })).toHaveLength(2);
   });
 
   it("sets the page title from the salon name", async () => {
@@ -142,10 +142,11 @@ describe("the home page", () => {
     vi.stubGlobal("fetch", reply(salon));
     render(<App {...props} />);
     await heading();
-    const links = screen.getAllByRole("link", { name: /Book Now|Reserve Your Experience|Schedule Appointment|Book Online/ });
+    const links = screen.getAllByRole("link", { name: /^Book now/ });
     expect(links.length).toBeGreaterThanOrEqual(5);
     for (const l of links) {
-      expect(l).toHaveAttribute("href", "https://book.example.com");
+      const href = l.getAttribute("href")!;
+      expect(href === "https://book.example.com" || href.startsWith("https://book.example.com/?service=")).toBe(true);
       expect(l).not.toHaveAttribute("target");
     }
     expect(screen.queryByText(/To book, call/)).toBeNull();
@@ -159,11 +160,11 @@ describe("the home page", () => {
     expect(screen.queryByText(/Sign In|Sign Up|Walk-in|Check In/i)).toBeNull();
   });
 
-  it("hides every Book Now and shows a call line when online booking is off", async () => {
+  it("hides every Book now and shows a call line when online booking is off", async () => {
     vi.stubGlobal("fetch", reply({ ...salon, onlineBookingEnabled: false }));
     render(<App {...props} />);
     await heading();
-    expect(screen.queryByRole("link", { name: /Book Now|Reserve|Schedule Appointment|Book Online/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^Book now/ })).toBeNull();
     expect(screen.getByText(/To book, call/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Call us" })).toBeInTheDocument();
   });
@@ -172,7 +173,7 @@ describe("the home page", () => {
     vi.stubGlobal("fetch", reply(salon));
     render(<App salonUrl={props.salonUrl} bookingUrl="" />);
     await heading();
-    expect(screen.queryByRole("link", { name: /Book Now|Reserve/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^Book now/ })).toBeNull();
   });
 
   it("hides phone, address and map links when the POS has none", async () => {
@@ -216,38 +217,53 @@ describe("addresses come from the configuration", () => {
     const { container } = render(<App salonUrl="http://fn.config-test.invalid/salon" bookingUrl={booking} />);
     await heading();
     const hrefs = [...container.querySelectorAll("a[href]")].map((a) => a.getAttribute("href")!);
-    const outbound = hrefs.filter((h) => !h.startsWith("/") && !h.startsWith("tel:") && !h.includes("google.com/maps"));
+    const outbound = hrefs.filter((h) => !h.startsWith("/") && !h.startsWith("#") && !h.startsWith("tel:") && !h.includes("google.com/maps"));
     expect(outbound.length).toBeGreaterThanOrEqual(5);
-    expect(new Set(outbound)).toEqual(new Set([booking]));
+    expect(new Set(outbound.map((h) => new URL(h).origin + new URL(h).pathname))).toEqual(new Set([booking]));
     expect(hrefs.filter((h) => h.startsWith("tel:"))).not.toHaveLength(0);
     for (const h of hrefs.filter((x) => x.startsWith("tel:"))) expect(h).toBe("tel:2085550100");
     expect(JSON.stringify(vi.mocked(fetch).mock.calls)).not.toContain("book.example.com");
   });
 
-  it("labels the four booking buttons the owner named", async () => {
+  it("calls the primary booking action Book now in the header, hero, call to action and footer", async () => {
     vi.stubGlobal("fetch", reply(salon));
     render(<App salonUrl="http://fn.config-test.invalid/salon" bookingUrl={booking} />);
     await heading();
-    for (const name of ["Reserve Your Experience", "Schedule Appointment", "Book Online"]) {
-      expect(screen.getAllByRole("link", { name: new RegExp(name) })[0]).toHaveAttribute("href", booking);
-    }
-    expect(screen.getAllByRole("link", { name: /^Book Now/ })[0]).toHaveAttribute("href", booking);
+    const plain = screen.getAllByRole("link", { name: "Book now" });
+    expect(plain.length).toBe(4);
+    for (const l of plain) expect(l).toHaveAttribute("href", booking);
+    expect(screen.queryByText(/Reserve Your Experience|Schedule Appointment|Book Online/)).toBeNull();
+  });
+
+  it("sends each service Book now to the booking page with that service id and keeps an existing query", async () => {
+    vi.stubGlobal("fetch", reply(salon));
+    render(<App salonUrl="http://fn.config-test.invalid/salon" bookingUrl={`${booking}?ref=hub`} />);
+    await heading();
+    const popular = screen.getByRole("region", { name: "Popular Services" });
+    const manicure = within(popular).getByRole("link", { name: "Book now: Manicure" });
+    const url = new URL(manicure.getAttribute("href")!);
+    expect(url.origin + url.pathname).toBe(booking);
+    expect(url.searchParams.get("service")).toBe("a");
+    expect(url.searchParams.get("ref")).toBe("hub");
   });
 
   it("uses the same bookingUrl on the services page", async () => {
     vi.stubGlobal("fetch", reply(salon));
     render(<App salonUrl="http://fn.config-test.invalid/salon" bookingUrl={booking} path="/services" />);
     await screen.findByRole("heading", { level: 1, name: "Our Services" });
-    const links = [...screen.getAllByRole("link", { name: /Book Now|Book Online/ })];
-    expect(links.length).toBe(4);
-    for (const l of links) expect(l).toHaveAttribute("href", booking);
+    const links = [...screen.getAllByRole("link", { name: /^Book now/ })];
+    expect(links.length).toBe(5);
+    const cards = links.filter((l) => /^Book now: /.test(l.getAttribute("aria-label") ?? ""));
+    expect(cards).toHaveLength(3);
+    expect(cards.map((l) => new URL(l.getAttribute("href")!).searchParams.get("service")).sort()).toEqual(["a", "b", "c"]);
+    for (const l of links.filter((x) => !cards.includes(x))) expect(l).toHaveAttribute("href", booking);
   });
 
   it("shows the call line and no booking link when bookingUrl is missing, and still shows the data", async () => {
     vi.stubGlobal("fetch", reply(salon));
     render(<App salonUrl="http://fn.config-test.invalid/salon" />);
     await heading();
-    expect(screen.queryByRole("link", { name: /Book Now|Reserve|Schedule Appointment|Book Online/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^Book now/ })).toBeNull();
     expect(screen.getByText(/To book, call/)).toBeInTheDocument();
     expect(screen.getByText("Manicure")).toBeInTheDocument();
   });
@@ -274,14 +290,14 @@ describe("the services page", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Feet" })).toBeInTheDocument();
     expect(screen.getByText("Gel polish").closest("div.rounded-xl")).toHaveTextContent("$10.50");
     expect(screen.getByText("Gel polish").closest("div.rounded-xl")).toHaveTextContent("Add-on");
-    expect(screen.getAllByRole("link", { name: /^Book Now/ })).toHaveLength(3);
+    expect(screen.getAllByRole("link", { name: /^Book now: / })).toHaveLength(3);
   });
 
-  it("hides Book Now and shows the phone when online booking is off", async () => {
+  it("hides Book now and shows the phone when online booking is off", async () => {
     vi.stubGlobal("fetch", reply({ ...salon, onlineBookingEnabled: false }));
     render(<App {...props} path="/services/" />);
     await screen.findByRole("heading", { level: 1, name: "Our Services" });
-    expect(screen.queryByRole("link", { name: /^Book Now/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^Book now: / })).toBeNull();
     expect(screen.getByText(/To book, call/)).toBeInTheDocument();
   });
 
@@ -300,5 +316,68 @@ describe("not found", () => {
     expect(screen.getByRole("heading", { name: "Page not found" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Go to the home page" })).toHaveAttribute("href", "/");
     expect(fn).not.toHaveBeenCalled();
+  });
+});
+
+describe("the header, the mark and the first paint", () => {
+  const booking = "https://booking.config-test.invalid/start";
+
+  it("shows the salon mark made from the name, next to the name, in the header", async () => {
+    vi.stubGlobal("fetch", reply(salon));
+    render(<App {...props} />);
+    await heading();
+    const header = screen.getByRole("banner");
+    expect(within(header).getByTestId("salon-mark")).toHaveTextContent("TN");
+    expect(within(header).getByText("Test Nails")).toBeInTheDocument();
+  });
+
+  it("puts one Book now pill in the header and no pill when booking is off", async () => {
+    vi.stubGlobal("fetch", reply(salon));
+    const { unmount } = render(<App salonUrl={props.salonUrl} bookingUrl={booking} />);
+    await heading();
+    expect(within(screen.getByRole("banner")).getByRole("link", { name: "Book now" })).toHaveAttribute("href", booking);
+    unmount();
+    vi.stubGlobal("fetch", reply({ ...salon, onlineBookingEnabled: false }));
+    render(<App salonUrl={props.salonUrl} bookingUrl={booking} />);
+    await heading();
+    expect(within(screen.getByRole("banner")).queryByRole("link", { name: /Book now/ })).toBeNull();
+  });
+
+  it("starts with a skip link that points at the main landmark", async () => {
+    vi.stubGlobal("fetch", reply(salon));
+    render(<App {...props} />);
+    await heading();
+    const skip = screen.getByRole("link", { name: "Skip to main content" });
+    expect(skip).toHaveAttribute("href", "#main");
+    expect(screen.getByRole("main")).toHaveAttribute("id", "main");
+    expect(document.body.querySelector("a")).toBe(skip);
+  });
+
+  it("makes the touch targets at least 44px high: Book now buttons, footer links and the menu button", async () => {
+    vi.stubGlobal("fetch", reply(salon));
+    render(<App {...props} path="/services" />);
+    await screen.findByRole("heading", { level: 1, name: "Our Services" });
+    for (const l of screen.getAllByRole("link", { name: /^Book now/ })) expect(l.className).toContain("min-h-[44px]");
+    const footer = within(screen.getByRole("contentinfo"));
+    for (const l of [footer.getByRole("link", { name: "Services" }), footer.getByRole("link", { name: "(208) 555-0100" }), footer.getByRole("link", { name: "1 Main St, Boise, ID" })]) {
+      expect(l.className).toContain("min-h-[44px]");
+    }
+    expect(screen.getByRole("button", { name: "Open menu" }).className).toContain("h-11");
+  });
+
+  it("shows the stat cards two across on a phone", async () => {
+    vi.stubGlobal("fetch", reply(salon));
+    render(<App {...props} />);
+    await heading();
+    expect(screen.getByText("Services offered").closest("div.grid")).toHaveClass("grid-cols-2", "md:grid-cols-4");
+  });
+
+  it("uses a dark amber text on the category chip", async () => {
+    vi.stubGlobal("fetch", reply(salon));
+    render(<App {...props} />);
+    await heading();
+    const chip = within(screen.getByRole("region", { name: "Popular Services" })).getByText("Hands");
+    expect(chip).toHaveClass("text-accent-ink");
+    expect(chip).not.toHaveClass("text-accent");
   });
 });

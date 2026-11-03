@@ -31,9 +31,9 @@ export function Home({ salon, bookingUrl, now, copy = defaultCopy }: HomeProps) 
 
   return (
     <div className="min-h-screen bg-paper">
-      <SiteHeader name={salon.name} tagline={copy.tagline} active="home" />
+      <SiteHeader name={salon.name} tagline={copy.tagline} active="home" bookingUrl={canBook ? bookingUrl : undefined} />
 
-      <main>
+      <main id="main" tabIndex={-1} className="outline-none">
         <section aria-labelledby="hero" className="px-4 py-20">
           <div className="mx-auto max-w-6xl text-center">
             <div className="mb-8">
@@ -70,10 +70,10 @@ export function Home({ salon, bookingUrl, now, copy = defaultCopy }: HomeProps) 
             ) : null}
 
             {stats.length > 0 ? (
-              <div className="mb-20 grid grid-cols-1 gap-6 md:grid-cols-4">
+              <div className="mb-20 grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-4">
                 {stats.map((stat) => (
                   <Card key={stat.label} className="hover:shadow-md">
-                    <div className="p-6 text-center">
+                    <div className="p-4 text-center sm:p-6">
                       {stat.icon ? (
                         <div className="mb-3 flex justify-center text-brand">
                           <Icon name={stat.icon} className="h-6 w-6" />

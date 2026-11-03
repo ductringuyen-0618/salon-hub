@@ -39,6 +39,17 @@ function seconds(raw: string | undefined, fallbackMs: number): number {
   return raw !== undefined && /^\d{1,4}$/.test(raw) && Number(raw) >= 1 && Number(raw) <= 3600 ? Number(raw) * 1000 : fallbackMs;
 }
 
+/** Scheme, host and port only, host lowercased, default port dropped. null when the value is not an http or https origin. */
+export function normalizeOrigin(value: string | undefined): string | null {
+  if (value === undefined) return null;
+  try {
+    const u = new URL(value.trim());
+    return u.protocol === "http:" || u.protocol === "https:" ? u.origin : null;
+  } catch {
+    return null;
+  }
+}
+
 export const newCache = (): Cache => ({ salon: null, at: 0, inflight: null });
 
 export const realDeps = (): Deps => ({
@@ -89,7 +100,8 @@ async function fromPos(deps: Deps, base: string, keyId: string, secret: string):
 }
 
 export async function handle(req: Req, deps: Deps): Promise<Res> {
-  const origin = deps.env.ALLOWED_ORIGIN;
+  const rawOrigin = deps.env.ALLOWED_ORIGIN;
+  const origin = normalizeOrigin(rawOrigin) ?? undefined;
   const base = deps.env.POS_BASE_URL?.replace(/\/+$/, "");
   const keyId = deps.env.POS_PARTNER_KEY_ID;
   const secret = deps.env.POS_PARTNER_SECRET;
@@ -99,7 +111,7 @@ export async function handle(req: Req, deps: Deps): Promise<Res> {
     return json(500, { "cache-control": "no-store" }, { error: "not_configured" });
   }
 
-  if (req.origin !== undefined && req.origin !== origin) return json(403, { vary: "Origin", "cache-control": "no-store" }, { error: "origin_not_allowed" });
+  if (req.origin !== undefined && normalizeOrigin(req.origin) !== origin) return json(403, { vary: "Origin", "cache-control": "no-store" }, { error: "origin_not_allowed" });
   const freshMs = seconds(deps.env.SALON_CACHE_FRESH_SECONDS, FRESH_MS);
   const staleMs = Math.max(seconds(deps.env.SALON_CACHE_STALE_SECONDS, STALE_MS), freshMs);
   const cors = { "access-control-allow-origin": origin, vary: "Origin" };

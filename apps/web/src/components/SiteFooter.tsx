@@ -14,7 +14,8 @@ export function SiteFooter({ salon, today, tagline, canBook, bookingUrl, year }:
   const phone = salon.phone.trim();
   const address = salon.address.trim();
   const todayHours = salon.hours.find((h) => h.day === today);
-  const link = "block text-ink-muted transition-colors hover:text-brand";
+  const link = "flex min-h-[44px] items-center text-ink-muted transition-colors hover:text-brand";
+  const inline = "inline-flex min-h-[44px] items-center transition-colors hover:text-brand";
   return (
     <footer className="border-t border-line bg-surface px-4 py-12">
       <div className="mx-auto max-w-6xl">
@@ -25,30 +26,30 @@ export function SiteFooter({ salon, today, tagline, canBook, bookingUrl, year }:
           </div>
           <div>
             <h4 className="mb-4 font-medium text-ink">Quick Links</h4>
-            <div className="space-y-2">
+            <div>
               <a href="/services" className={link}>
                 Services
               </a>
               {canBook ? (
                 <a href={bookingUrl} className={link}>
-                  Book Online
+                  Book now
                 </a>
               ) : null}
             </div>
           </div>
           <div>
             <h4 className="mb-4 font-medium text-ink">Contact</h4>
-            <div className="space-y-2 text-sm text-ink-muted">
+            <div className="text-sm text-ink-muted">
               {address ? (
                 <p>
-                  <a href={mapHref(address)} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-brand">
+                  <a href={mapHref(address)} target="_blank" rel="noopener noreferrer" className={inline}>
                     {address}
                   </a>
                 </p>
               ) : null}
               {phone ? (
                 <p>
-                  <a href={telHref(phone)} className="transition-colors hover:text-brand">
+                  <a href={telHref(phone)} className={inline}>
                     {phone}
                   </a>
                 </p>

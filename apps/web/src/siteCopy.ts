@@ -16,7 +16,7 @@ export const siteCopy: SiteCopy = {
     titleTop: "Indulge in",
     titleAccent: "Pure Elegance",
     intro: "Manicures, pedicures and more. Take a moment for yourself and let us look after your hands and feet.",
-    primary: "Reserve Your Experience",
+    primary: "Book now",
     secondary: "Call us",
   },
   why: {
@@ -37,7 +37,7 @@ export const siteCopy: SiteCopy = {
   cta: {
     title: "Ready for Your Visit?",
     text: "Book your appointment online or give us a call.",
-    primary: "Schedule Appointment",
+    primary: "Book now",
     secondary: "Explore Services",
   },
   stats: [],

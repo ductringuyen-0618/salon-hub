@@ -27,7 +27,7 @@ Function (`apps/salon-function/.env.example`):
 | `POS_BASE_URL` | The POS origin, for example `https://pos.example.com`. No trailing path. |
 | `POS_PARTNER_KEY_ID` | The key id shown in the POS. |
 | `POS_PARTNER_SECRET` | The secret, shown once when the key is made. Function only. |
-| `ALLOWED_ORIGIN` | The one site origin allowed by CORS. A `*` is refused. A request that names any other `Origin` gets 403. |
+| `ALLOWED_ORIGIN` | The one site origin allowed by CORS. Compared as scheme, host and port, so a trailing slash, a path or an uppercase host is fine. A `*` is refused. A request that names any other `Origin` gets 403. |
 | `SALON_CACHE_FRESH_SECONDS` | Optional. How long a POS reply is served without asking again. Default 60. A whole number from 1 to 3600. |
 | `SALON_CACHE_STALE_SECONDS` | Optional. How long the last good reply is served, marked stale, when the POS is down. Default 600. Never shorter than the fresh window. |
 
@@ -42,7 +42,7 @@ The site has no web address written into its code. It reads two addresses when i
 | Key | Meaning |
 | --- | --- |
 | `salonUrl` | The salon function. The one data fetch uses it. |
-| `bookingUrl` | The POS online booking page. Reserve Your Experience, every Book Now, Schedule Appointment and the footer Book Online all use it. |
+| `bookingUrl` | The POS online booking page. Every Book now (header, hero, call to action, footer) uses it, and each service card adds `?service=<serviceRef>`. |
 | `siteUrl` | Optional. This site's own address, used for the canonical link. |
 
 Only `http` and `https` addresses count. Anything else is ignored. If a key is missing or invalid the site falls back to the build time variables `VITE_SALON_URL` and `VITE_BOOKING_URL` (`apps/web/.env.example`), and after that to a plain state. With no `salonUrl` the page says "This site is not set up yet" (and shows the phone from the last visit, if the browser remembers it). With no `bookingUrl` every Book now is hidden and the call line shows the salon phone. There is no built in host to fall back to.

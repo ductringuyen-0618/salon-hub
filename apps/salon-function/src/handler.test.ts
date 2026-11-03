@@ -252,6 +252,49 @@ describe("CORS and methods", () => {
     expect((await handle({ method: "GET" }, deps(pos().fn))).statusCode).toBe(200);
   });
 
+  describe("ALLOWED_ORIGIN is compared as an origin", () => {
+    it.each([
+      ["a trailing slash", "https://salon.example.com/", "https://salon.example.com"],
+      ["an uppercase host", "https://SALON.Example.com", "https://salon.example.com"],
+      ["the default port written out", "https://salon.example.com:443", "https://salon.example.com"],
+      ["a path in the setting", "https://salon.example.com/some/page?x=1", "https://salon.example.com"],
+      ["surrounding spaces", "  https://salon.example.com  ", "https://salon.example.com"],
+    ])("accepts the site when the setting has %s", async (_n, setting, sent) => {
+      const res = await handle({ method: "GET", origin: sent }, deps(pos().fn, { ALLOWED_ORIGIN: setting }));
+      expect(res.statusCode).toBe(200);
+      expect(res.headers["access-control-allow-origin"]).toBe("https://salon.example.com");
+    });
+
+    it("accepts a browser Origin written with an uppercase host or the default port", async () => {
+      for (const sent of ["https://SALON.example.com", "https://salon.example.com:443"]) {
+        expect((await handle({ method: "GET", origin: sent }, deps(pos().fn))).statusCode).toBe(200);
+      }
+    });
+
+    it("keeps a non default port significant", async () => {
+      const env = { ALLOWED_ORIGIN: "http://hub.example.test:5310/" };
+      expect((await handle({ method: "GET", origin: "http://hub.example.test:5310" }, deps(pos().fn, env))).statusCode).toBe(200);
+      expect((await handle({ method: "GET", origin: "http://hub.example.test" }, deps(pos().fn, env))).statusCode).toBe(403);
+      expect((await handle({ method: "GET", origin: "http://hub.example.test:5311" }, deps(pos().fn, env))).statusCode).toBe(403);
+    });
+
+    it.each(["https://evil.example.net", "http://salon.example.com", "https://salon.example.com.evil.net", "https://evil.net/https://salon.example.com", "null", "not a url"])(
+      "still refuses %s with a trailing slash setting",
+      async (sent) => {
+        const p = pos();
+        const res = await handle({ method: "GET", origin: sent }, deps(p.fn, { ALLOWED_ORIGIN: "https://salon.example.com/" }));
+        expect(res.statusCode).toBe(403);
+        expect(res.headers["access-control-allow-origin"]).toBeUndefined();
+        expect(p.seen).toHaveLength(0);
+      },
+    );
+
+    it.each(["salon.example.com", "ftp://salon.example.com", "https://"])("treats the unusable setting %s as not configured", async (setting) => {
+      const res = await handle(get, deps(pos().fn, { ALLOWED_ORIGIN: setting }));
+      expect(res.statusCode).toBe(500);
+    });
+  });
+
   it("uses SALON_CACHE_FRESH_SECONDS and SALON_CACHE_STALE_SECONDS, and tells the browser no longer than the fresh window", async () => {
     const env = { SALON_CACHE_FRESH_SECONDS: "2", SALON_CACHE_STALE_SECONDS: "6" };
     const p = pos();

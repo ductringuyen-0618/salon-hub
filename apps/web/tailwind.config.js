@@ -15,7 +15,7 @@ export default {
         line: "#e5e7eb",
         paper: "#fafafa",
         surface: "#ffffff",
-        accent: "#f59e0b",
+        accent: { DEFAULT: "#f59e0b", ink: "#7a5900" },
       },
     },
   },
