@@ -1,30 +1,9 @@
-# React + TypeScript + Vite
+# Salon web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Static React site. Name, phone, address, hours and services come from the salon function (`VITE_SALON_URL`). Book Now goes to `VITE_BOOKING_URL`.
 
-Currently, two official plugins are available:
+The owner edits `src/siteCopy.ts` for the tagline, hero lines, the four Why Choose cards, the call to action and an optional stats list. Only claim what is true. The stats list is empty by default, and the stat band then shows values from the salon data.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Home shows the most expensive service of each category, in category order (four at most, filled with the next most expensive if there are fewer than four categories). Booking buttons are hidden and the phone is shown when online booking is off.
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
-
-- Configure the top-level `parserOptions` property like this:
-
-```js
-export default {
-  // other rules...
-  parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-  },
-}
-```
-
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+Commands: `npm run lint`, `npm test`, `npm run build`.

@@ -1,130 +1,167 @@
+import { ArrowRight, Calendar, Phone, Sparkles } from "lucide-react";
 import { useEffect } from "react";
-import { DAY_NAME, formatDuration, formatPrice, formatRange, groupByCategory, mapHref, telHref, todayIn, weekFromMonday } from "../lib/format";
+import { telHref, todayIn } from "../lib/format";
+import { featuredServices, homeStats } from "../lib/home";
 import type { Salon } from "../lib/salon";
-import { Logo } from "./Logo";
+import { siteCopy as defaultCopy, type SiteCopy } from "../siteCopy";
+import { ServiceCard } from "./ServiceCard";
+import { SiteFooter } from "./SiteFooter";
+import { SiteHeader } from "./SiteHeader";
+import { Badge, Card, Icon, btnOutline, btnPrimary } from "./ui";
 
 export interface HomeProps {
   salon: Salon;
   bookingUrl?: string;
   now?: Date;
+  copy?: SiteCopy;
 }
 
-export function Home({ salon, bookingUrl, now }: HomeProps) {
+export function Home({ salon, bookingUrl, now, copy = defaultCopy }: HomeProps) {
   useEffect(() => {
     document.title = salon.name;
     document.querySelector('meta[name="description"]')?.setAttribute("content", `${salon.name}, ${salon.address}. Hours, services and online booking.`);
   }, [salon.name, salon.address]);
 
   const today = todayIn(salon.salonTimeZone, now);
-  const week = weekFromMonday(salon.hours);
-  const todayHours = salon.hours.find((h) => h.day === today);
   const canBook = salon.onlineBookingEnabled && Boolean(bookingUrl);
   const phone = salon.phone.trim();
-  const address = salon.address.trim();
-  const groups = groupByCategory(salon.services);
+  const stats = homeStats(salon, today, copy.stats);
+  const featured = featuredServices(salon.services);
+  const year = (now ?? new Date()).getFullYear();
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-line bg-white">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
-          <Logo name={salon.name} />
-          {phone ? (
-            <a href={telHref(phone)} className="font-medium text-brand hover:text-brand-hover">
-              {phone}
-            </a>
-          ) : null}
-        </div>
-      </header>
+    <div className="min-h-screen bg-paper">
+      <SiteHeader name={salon.name} tagline={copy.tagline} active="home" />
 
-      <main className="mx-auto max-w-5xl px-4 py-8">
-        <section aria-labelledby="hero" className="rounded-xl bg-brand-soft p-6 sm:p-10">
-          <h1 id="hero" className="break-words text-3xl font-bold text-brand-dark sm:text-4xl">
-            {salon.name}
-          </h1>
-          {todayHours ? (
-            <p className="mt-2 text-ink-soft">
-              Today, {DAY_NAME[today]}: <span className="font-medium text-ink">{formatRange(todayHours)}</span>
-            </p>
-          ) : null}
-          <div className="mt-6">
-            {canBook ? (
-              <a href={bookingUrl} className="inline-block rounded-lg bg-brand px-6 py-3 text-lg font-semibold text-white hover:bg-brand-hover">
-                Book now
-              </a>
-            ) : phone ? (
-              <p className="text-lg">
+      <main>
+        <section aria-labelledby="hero" className="px-4 py-20">
+          <div className="mx-auto max-w-6xl text-center">
+            <div className="mb-8">
+              <Badge className="mb-6 border-brand/20 bg-brand/10 text-brand">{copy.hero.badge}</Badge>
+              <h1 id="hero" className="mb-6 text-4xl font-light leading-tight text-ink md:text-6xl lg:text-7xl">
+                <span className="sr-only">{salon.name}. </span>
+                <span className="block">{copy.hero.titleTop}</span>
+                <span className="block font-light italic text-brand">{copy.hero.titleAccent}</span>
+              </h1>
+              <p className="mx-auto mb-12 max-w-3xl text-xl leading-relaxed text-ink-muted">{copy.hero.intro}</p>
+            </div>
+
+            <div className="mb-16 flex flex-col items-center justify-center gap-6 sm:flex-row">
+              {canBook ? (
+                <a href={bookingUrl} className={btnPrimary}>
+                  {copy.hero.primary}
+                  <ArrowRight aria-hidden="true" className="h-5 w-5" />
+                </a>
+              ) : null}
+              {phone ? (
+                <a href={telHref(phone)} className={btnOutline}>
+                  {copy.hero.secondary}
+                  <Phone aria-hidden="true" className="h-5 w-5" />
+                </a>
+              ) : null}
+            </div>
+            {!canBook && phone ? (
+              <p className="-mt-8 mb-16 text-lg text-ink-muted">
                 To book, call{" "}
                 <a href={telHref(phone)} className="font-semibold text-brand underline">
                   {phone}
                 </a>
               </p>
             ) : null}
+
+            {stats.length > 0 ? (
+              <div className="mb-20 grid grid-cols-1 gap-6 md:grid-cols-4">
+                {stats.map((stat) => (
+                  <Card key={stat.label} className="hover:shadow-md">
+                    <div className="p-6 text-center">
+                      {stat.icon ? (
+                        <div className="mb-3 flex justify-center text-brand">
+                          <Icon name={stat.icon} className="h-6 w-6" />
+                        </div>
+                      ) : null}
+                      <div className="mb-1 text-2xl font-semibold text-ink">{stat.value}</div>
+                      <div className="text-sm text-ink-muted">{stat.label}</div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : null}
           </div>
         </section>
 
-        <div className="mt-8 grid gap-8 md:grid-cols-2">
-          <section aria-labelledby="visit" className="rounded-xl border border-line bg-white p-6">
-            <h2 id="visit" className="text-xl font-semibold">
-              Visit
-            </h2>
-            {address ? (
-              <>
-                <p className="mt-3 break-words">{address}</p>
-                <a href={mapHref(address)} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block font-medium text-brand hover:text-brand-hover">
-                  View on map
-                </a>
-              </>
-            ) : null}
-            {phone ? (
-              <p className="mt-4">
-                <a href={telHref(phone)} className="font-medium text-brand hover:text-brand-hover">
-                  Call {phone}
-                </a>
-              </p>
-            ) : null}
-            {!address && !phone ? <p className="mt-3 text-ink-soft">Contact details are not listed yet.</p> : null}
-          </section>
-
-          <section aria-labelledby="hours" className="rounded-xl border border-line bg-white p-6">
-            <h2 id="hours" className="text-xl font-semibold">
-              Hours
-            </h2>
-            <ul className="mt-3 divide-y divide-line">
-              {week.map((h) => (
-                <li key={h.day} className={`flex justify-between gap-4 py-2 ${h.day === today ? "font-semibold text-brand-dark" : ""}`}>
-                  <span>{DAY_NAME[h.day]}</span>
-                  <span>{formatRange(h)}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
-
-        <section aria-labelledby="services" className="mt-8">
-          <h2 id="services" className="text-2xl font-semibold">
-            Services
-          </h2>
-          {groups.length === 0 ? <p className="mt-3 text-ink-soft">No services are listed yet.</p> : null}
-          {groups.map((g) => (
-            <div key={g.category} className="mt-6">
-              <h3 className="text-lg font-semibold capitalize text-brand-dark">{g.category}</h3>
-              <ul className="mt-2 divide-y divide-line rounded-xl border border-line bg-white">
-                {g.items.map((s) => (
-                  <li key={s.serviceRef} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3">
-                    <span className="min-w-0 break-words font-medium">
-                      {s.name}
-                      {s.kind === "addon" ? <span className="ml-2 rounded bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-dark">Add-on</span> : null}
-                    </span>
-                    <span className="text-ink-soft">
-                      {formatDuration(s.durationMin)}, from <span className="font-semibold text-ink">{formatPrice(s.fromPriceCents)}</span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
+        <section aria-labelledby="why" className="bg-surface px-4 py-20">
+          <div className="mx-auto max-w-6xl">
+            <div className="mb-16 text-center">
+              <h2 id="why" className="mb-4 text-4xl font-light text-ink">
+                {copy.why.title} {salon.name}
+              </h2>
+              <p className="mx-auto max-w-2xl text-xl text-ink-muted">{copy.why.intro}</p>
             </div>
-          ))}
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
+              {copy.why.cards.map((card) => (
+                <Card key={card.title} className="bg-paper hover:-translate-y-1 hover:shadow-lg">
+                  <div className="p-8 text-center">
+                    <div className="mb-4 flex justify-center text-brand">
+                      <Icon name={card.icon} className="h-8 w-8" />
+                    </div>
+                    <h3 className="mb-3 text-xl font-medium text-ink">{card.title}</h3>
+                    <p className="leading-relaxed text-ink-muted">{card.description}</p>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="popular" className="px-4 py-20">
+          <div className="mx-auto max-w-6xl">
+            <div className="mb-16 text-center">
+              <h2 id="popular" className="mb-4 text-4xl font-light text-ink">
+                {copy.services.title}
+              </h2>
+              <p className="mx-auto max-w-2xl text-xl text-ink-muted">{copy.services.intro}</p>
+            </div>
+            {featured.length === 0 ? <p className="text-center text-ink-muted">No services are listed yet.</p> : null}
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+              {featured.map((s) => (
+                <ServiceCard key={s.serviceRef} service={s} bookingUrl={canBook ? bookingUrl : undefined} />
+              ))}
+            </div>
+            <div className="mt-12 text-center">
+              <a href="/services" className="mx-auto inline-flex items-center gap-2 rounded-full bg-brand px-8 py-3 font-medium text-white transition-all duration-300 hover:bg-brand-hover">
+                {copy.services.viewAll}
+                <ArrowRight aria-hidden="true" className="h-5 w-5" />
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="cta" className="bg-gradient-to-r from-brand/5 to-accent/5 px-4 py-20">
+          <div className="mx-auto max-w-4xl text-center">
+            <div className="rounded-3xl border border-line bg-surface p-8 shadow-lg sm:p-12">
+              <Sparkles aria-hidden="true" className="mx-auto mb-6 h-16 w-16 text-brand" />
+              <h2 id="cta" className="mb-4 text-3xl font-light text-ink">
+                {copy.cta.title}
+              </h2>
+              <p className="mx-auto mb-8 max-w-2xl text-xl text-ink-muted">{copy.cta.text}</p>
+              <div className="flex flex-col justify-center gap-4 sm:flex-row">
+                {canBook ? (
+                  <a href={bookingUrl} className="inline-flex items-center justify-center gap-2 rounded-full bg-brand px-8 py-3 text-lg font-medium text-white transition-all duration-300 hover:bg-brand-hover">
+                    <Calendar aria-hidden="true" className="h-5 w-5" />
+                    {copy.cta.primary}
+                  </a>
+                ) : null}
+                <a href="/services" className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-line px-8 py-3 text-lg font-medium text-ink transition-all duration-300 hover:border-brand hover:text-brand">
+                  <Sparkles aria-hidden="true" className="h-5 w-5" />
+                  {copy.cta.secondary}
+                </a>
+              </div>
+            </div>
+          </div>
         </section>
       </main>
+
+      <SiteFooter salon={salon} today={today} tagline={copy.tagline} canBook={canBook} bookingUrl={bookingUrl} year={year} />
     </div>
   );
 }
