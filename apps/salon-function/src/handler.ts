@@ -24,12 +24,19 @@ export interface Deps {
 
 export interface Req {
   method: string;
+  /** The request Origin header, when the caller passes headers on. A browser sends it on cross-site calls. */
+  origin?: string;
 }
 
 export interface Res {
   statusCode: number;
   headers: Record<string, string>;
   body: string;
+}
+
+/** A whole number of seconds from 1 to 3600, otherwise the default. Lets a test or a deployment shorten the windows. */
+function seconds(raw: string | undefined, fallbackMs: number): number {
+  return raw !== undefined && /^\d{1,4}$/.test(raw) && Number(raw) >= 1 && Number(raw) <= 3600 ? Number(raw) * 1000 : fallbackMs;
 }
 
 export const newCache = (): Cache => ({ salon: null, at: 0, inflight: null });
@@ -92,7 +99,11 @@ export async function handle(req: Req, deps: Deps): Promise<Res> {
     return json(500, { "cache-control": "no-store" }, { error: "not_configured" });
   }
 
+  if (req.origin !== undefined && req.origin !== origin) return json(403, { vary: "Origin", "cache-control": "no-store" }, { error: "origin_not_allowed" });
+  const freshMs = seconds(deps.env.SALON_CACHE_FRESH_SECONDS, FRESH_MS);
+  const staleMs = Math.max(seconds(deps.env.SALON_CACHE_STALE_SECONDS, STALE_MS), freshMs);
   const cors = { "access-control-allow-origin": origin, vary: "Origin" };
+  const cacheControl = `public, max-age=${Math.min(30, Math.floor(freshMs / 1000))}`;
   if (req.method === "OPTIONS") {
     return { statusCode: 204, headers: { ...cors, "access-control-allow-methods": "GET, OPTIONS", "access-control-max-age": "600" }, body: "" };
   }
@@ -100,7 +111,7 @@ export async function handle(req: Req, deps: Deps): Promise<Res> {
 
   const { cache } = deps;
   const age = () => deps.now() - cache.at;
-  if (cache.salon !== null && age() < FRESH_MS) return json(200, { ...cors, "cache-control": "public, max-age=30" }, cache.salon);
+  if (cache.salon !== null && age() < freshMs) return json(200, { ...cors, "cache-control": cacheControl }, cache.salon);
 
   cache.inflight ??= fromPos(deps, base, keyId, secret).finally(() => {
     cache.inflight = null;
@@ -109,8 +120,8 @@ export async function handle(req: Req, deps: Deps): Promise<Res> {
   if (fresh !== null) {
     cache.salon = fresh;
     cache.at = deps.now();
-    return json(200, { ...cors, "cache-control": "public, max-age=30" }, fresh);
+    return json(200, { ...cors, "cache-control": cacheControl }, fresh);
   }
-  if (cache.salon !== null && age() < STALE_MS) return json(200, { ...cors, "cache-control": "public, max-age=30" }, { ...cache.salon, stale: true });
+  if (cache.salon !== null && age() < staleMs) return json(200, { ...cors, "cache-control": cacheControl }, { ...cache.salon, stale: true });
   return json(502, { ...cors, "cache-control": "no-store" }, { error: "upstream_unavailable" });
 }

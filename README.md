@@ -14,7 +14,7 @@ The function exists because the partner API is signed with a secret. A browser m
 
 | Path | What it is |
 | --- | --- |
-| `apps/web` | Vite, React and Tailwind. One Home page and one 404. One fetch of `VITE_SALON_URL`. |
+| `apps/web` | Vite, React and Tailwind. A Home page, a Services page and a 404. One fetch of `config.json` at start, then one fetch of the salon function. |
 | `apps/salon-function` | Node 22 and TypeScript, built to one file. `handle(request, deps)` is the testable core. `project.yml` and `packages/salon/get/` are the DigitalOcean Functions layout. |
 | `.app.yaml` | DigitalOcean App Platform spec. Placeholders only, no secret values. |
 
@@ -27,16 +27,29 @@ Function (`apps/salon-function/.env.example`):
 | `POS_BASE_URL` | The POS origin, for example `https://pos.example.com`. No trailing path. |
 | `POS_PARTNER_KEY_ID` | The key id shown in the POS. |
 | `POS_PARTNER_SECRET` | The secret, shown once when the key is made. Function only. |
-| `ALLOWED_ORIGIN` | The one site origin allowed by CORS. A `*` is refused. |
+| `ALLOWED_ORIGIN` | The one site origin allowed by CORS. A `*` is refused. A request that names any other `Origin` gets 403. |
+| `SALON_CACHE_FRESH_SECONDS` | Optional. How long a POS reply is served without asking again. Default 60. A whole number from 1 to 3600. |
+| `SALON_CACHE_STALE_SECONDS` | Optional. How long the last good reply is served, marked stale, when the POS is down. Default 600. Never shorter than the fresh window. |
 
-Web (`apps/web/.env.example`), read at build time and visible to every visitor:
+## Web addresses: config.json
 
-| Name | Meaning |
+The site has no web address written into its code. It reads two addresses when it starts, from `/config.json`, fetched once with `no-store`. Copy `apps/web/public/config.example.json` to `apps/web/public/config.json` (the real file is gitignored) and fill it in:
+
+```json
+{ "salonUrl": "https://your-function-address/salon", "bookingUrl": "https://your-pos-booking-page", "siteUrl": "https://your-hub-address" }
+```
+
+| Key | Meaning |
 | --- | --- |
-| `VITE_SALON_URL` | The URL of the salon function. |
-| `VITE_BOOKING_URL` | The POS online booking page. The Book now button uses it. |
+| `salonUrl` | The salon function. The one data fetch uses it. |
+| `bookingUrl` | The POS online booking page. Reserve Your Experience, every Book Now, Schedule Appointment and the footer Book Online all use it. |
+| `siteUrl` | Optional. This site's own address, used for the canonical link. |
 
-Never put the partner secret in the web app. Anything named `VITE_` is public.
+Only `http` and `https` addresses count. Anything else is ignored. If a key is missing or invalid the site falls back to the build time variables `VITE_SALON_URL` and `VITE_BOOKING_URL` (`apps/web/.env.example`), and after that to a plain state. With no `salonUrl` the page says "This site is not set up yet" (and shows the phone from the last visit, if the browser remembers it). With no `bookingUrl` every Book now is hidden and the call line shows the salon phone. There is no built in host to fall back to.
+
+**After deployment the owner edits `config.json` (or the two variables, then redeploys) and nothing else.** With `config.json` there is no code change and no rebuild. A test fails if a host such as `localhost` or `vercel.app` is written into `apps/web/src`.
+
+Never put the partner secret in the web app. `config.json` and anything named `VITE_` is public.
 
 ## Create the partner key in the POS
 
@@ -66,7 +79,8 @@ node --env-file=.env.local dev-server.mjs      # http://127.0.0.1:8788
 Web against that function:
 
 ```sh
-VITE_SALON_URL=http://127.0.0.1:8788 VITE_BOOKING_URL=https://book.example.com npm run dev
+cp apps/web/public/config.example.json apps/web/public/config.json   # then edit it
+npm run dev
 ```
 
 `ALLOWED_ORIGIN` must equal the origin the browser shows, for example `http://localhost:5173`.
@@ -78,7 +92,8 @@ VITE_SALON_URL=http://127.0.0.1:8788 VITE_BOOKING_URL=https://book.example.com n
 - If the POS fails, it serves the last good reply for up to 10 minutes with `"stale": true`. After that it returns `502` with `{"error":"upstream_unavailable"}`.
 - Waits 5 seconds for the POS. Never forwards a POS body or header. Logs no secret.
 - Drops any field not in the contract and refuses a reply with a wrong shape.
-- Replies carry `Cache-Control: public, max-age=30`.
+- Replies carry `Cache-Control: public, max-age=30` (never longer than the fresh window).
+- A request that sends an `Origin` other than `ALLOWED_ORIGIN` gets 403 `origin_not_allowed` with no CORS header. A request with no `Origin` is served.
 
 ## Deploy on DigitalOcean
 

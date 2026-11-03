@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Home } from "./components/Home";
 import { ServicesPage } from "./components/ServicesPage";
 import { NotFound } from "./components/NotFound";
-import { LoadError, Loading } from "./components/Status";
+import { LoadError, Loading, NotConfigured, StaleNotice } from "./components/Status";
 import { fetchSalon, recallContact, rememberContact, type Salon } from "./lib/salon";
 
 type State = { kind: "loading" } | { kind: "error" } | { kind: "ready"; salon: Salon };
@@ -13,7 +13,7 @@ export interface AppProps {
   path?: string;
 }
 
-export default function App({ salonUrl = import.meta.env.VITE_SALON_URL, bookingUrl = import.meta.env.VITE_BOOKING_URL, path = window.location.pathname }: AppProps) {
+export default function App({ salonUrl, bookingUrl, path = window.location.pathname }: AppProps) {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
   const clean = path.length > 1 ? path.replace(/\/+$/, "") : path;
@@ -43,8 +43,15 @@ export default function App({ salonUrl = import.meta.env.VITE_SALON_URL, booking
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
   if (!known) return <NotFound />;
+  if (!salonUrl) return <NotConfigured contact={recallContact()} />;
   if (state.kind === "loading") return <Loading />;
   if (state.kind === "error") return <LoadError contact={recallContact()} onRetry={retry} />;
-  if (isServices) return <ServicesPage salon={state.salon} bookingUrl={bookingUrl} />;
-  return <Home salon={state.salon} bookingUrl={bookingUrl} />;
+  const page = isServices ? <ServicesPage salon={state.salon} bookingUrl={bookingUrl} /> : <Home salon={state.salon} bookingUrl={bookingUrl} />;
+  if (state.salon.stale !== true) return page;
+  return (
+    <>
+      <StaleNotice />
+      {page}
+    </>
+  );
 }

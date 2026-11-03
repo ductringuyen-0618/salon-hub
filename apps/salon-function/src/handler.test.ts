@@ -238,6 +238,48 @@ describe("CORS and methods", () => {
     expect(p.seen).toHaveLength(0);
   });
 
+  it.each(["GET", "OPTIONS"])("gives a foreign Origin on %s a 403 with no CORS header and no POS call", async (method) => {
+    const p = pos();
+    const res = await handle({ method, origin: "https://evil.example.net" }, deps(p.fn));
+    expect(res.statusCode).toBe(403);
+    expect(res.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(res.body).toBe('{"error":"origin_not_allowed"}');
+    expect(p.seen).toHaveLength(0);
+  });
+
+  it("serves the allowed origin and a request that sends no Origin", async () => {
+    expect((await handle({ method: "GET", origin: ORIGIN }, deps(pos().fn))).statusCode).toBe(200);
+    expect((await handle({ method: "GET" }, deps(pos().fn))).statusCode).toBe(200);
+  });
+
+  it("uses SALON_CACHE_FRESH_SECONDS and SALON_CACHE_STALE_SECONDS, and tells the browser no longer than the fresh window", async () => {
+    const env = { SALON_CACHE_FRESH_SECONDS: "2", SALON_CACHE_STALE_SECONDS: "6" };
+    const p = pos();
+    const d = deps(p.fn, env);
+    const first = await handle(get, d);
+    expect(first.headers["cache-control"]).toBe("public, max-age=2");
+    await handle(get, d);
+    expect(p.seen).toHaveLength(1);
+    clock += 2_001;
+    await handle(get, d);
+    expect(p.seen).toHaveLength(2);
+    const down = deps(async () => new Response("no", { status: 500 }), env);
+    down.cache = d.cache;
+    clock += 2_001;
+    expect(JSON.parse((await handle(get, down)).body).stale).toBe(true);
+    clock += 6_000;
+    expect((await handle(get, down)).statusCode).toBe(502);
+  });
+
+  it.each(["0", "-1", "abc", "", "1e9"])("ignores the cache setting %j and keeps the defaults", async (bad) => {
+    const p = pos();
+    const d = deps(p.fn, { SALON_CACHE_FRESH_SECONDS: bad, SALON_CACHE_STALE_SECONDS: bad });
+    expect((await handle(get, d)).headers["cache-control"]).toBe("public, max-age=30");
+    clock += FRESH_MS - 1;
+    await handle(get, d);
+    expect(p.seen).toHaveLength(1);
+  });
+
   it("refuses a wildcard origin as a misconfiguration", async () => {
     const res = await handle(get, deps(pos().fn, { ALLOWED_ORIGIN: "*" }));
     expect(res.statusCode).toBe(500);

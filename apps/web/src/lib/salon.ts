@@ -18,6 +18,8 @@ export interface Salon {
   onlineBookingEnabled: boolean;
   hours: Hours[];
   services: ServiceItem[];
+  /** Set by the function when the POS could not be reached and this is the last good reply. */
+  stale?: boolean;
 }
 
 const KEEP = "salon-hub:last-contact";

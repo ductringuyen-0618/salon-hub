@@ -19,3 +19,6 @@ node_modules/
 apps/web/dist/
 apps/web/coverage/
 apps/salon-function/packages/salon/get/index.js
+
+# Runtime config for this machine. Copy apps/web/public/config.example.json.
+apps/web/public/config.json

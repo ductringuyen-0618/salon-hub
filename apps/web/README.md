@@ -1,6 +1,6 @@
 # Salon web
 
-Static React site. Name, phone, address, hours and services come from the salon function (`VITE_SALON_URL`). Book Now goes to `VITE_BOOKING_URL`.
+Static React site. Name, phone, address, hours and services come from the salon function (`salonUrl`). Book Now goes to `bookingUrl`. Both are read from `/config.json` at start (see the repo README), with `VITE_SALON_URL` and `VITE_BOOKING_URL` as the fallback. `HUB_PUBLIC_DIR` serves another folder of static files, for tests.
 
 The owner edits `src/siteCopy.ts` for the tagline, hero lines, the four Why Choose cards, the call to action and an optional stats list. Only claim what is true. The stats list is empty by default, and the stat band then shows values from the salon data.
 
